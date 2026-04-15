@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2a7d4f">
 <title>Test de Orientación Profesional — IES Luis Bueno Crespo</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Fraunces:opsz,wght@9..144,700;9..144,800&display=swap" rel="stylesheet">
@@ -28,9 +29,11 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .c-admin{background:#e3eaf2;color:var(--admin)}.c-comercio{background:#f5ece3;color:var(--comercio)}
 .c-obra{background:#e6f0e4;color:var(--obra)}.c-electro{background:#e0e7ed;color:var(--electro)}
 .c-textil{background:#f0e4f0;color:var(--textil)}
-.btn{display:inline-flex;align-items:center;gap:8px;background:var(--green);color:#fff;border:none;padding:13px 28px;border-radius:9px;font-family:'Outfit';font-size:14px;font-weight:700;cursor:pointer;transition:.2s}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--green);color:#fff;border:none;padding:15px 28px;border-radius:10px;font-family:'Outfit';font-size:15px;font-weight:700;cursor:pointer;transition:.2s;min-height:48px;-webkit-tap-highlight-color:transparent}
 .btn:hover{background:var(--green-dark);transform:translateY(-1px)}
+.btn:active{transform:translateY(0);opacity:.85}
 .btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn-full{width:100%}
 .btn-outline{background:var(--surface);color:var(--text);border:2px solid var(--border)}
 .btn-outline:hover{border-color:var(--green)}
 .btn-dark{background:var(--text);color:#fff}.btn-dark:hover{opacity:.85}
@@ -45,7 +48,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .q-num{font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px}
 .q-text{font-size:16px;font-weight:500;margin-bottom:18px;line-height:1.5}
 .opts{display:flex;flex-direction:column;gap:9px}
-.opt{display:flex;align-items:center;gap:11px;width:100%;padding:13px 14px;background:var(--bg);border:2px solid transparent;border-radius:10px;cursor:pointer;font-family:'Outfit';font-size:13.5px;text-align:left;color:var(--text);transition:.15s}
+.opt{display:flex;align-items:center;gap:11px;width:100%;padding:15px 14px;background:var(--bg);border:2px solid transparent;border-radius:10px;cursor:pointer;font-family:'Outfit';font-size:14px;text-align:left;color:var(--text);transition:.15s;min-height:48px;-webkit-tap-highlight-color:transparent}
 .opt:hover{border-color:var(--green);background:var(--green-light)}
 .opt.sel{border-color:var(--green);background:var(--green-light);font-weight:600}
 .opt-circle{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s}
@@ -84,10 +87,12 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .ss-fill{height:100%;background:var(--green);border-radius:3px;transition:width 1s}
 .ss-verdict{font-size:11px;font-weight:600;margin-bottom:6px}
 .ss-verdict.good{color:var(--green)}.ss-verdict.ok{color:var(--amber)}.ss-verdict.low{color:var(--red)}
-.qr-section{text-align:center;padding:28px}
-.qr-code{display:inline-block;padding:16px;background:#fff;border-radius:12px;border:2px solid var(--green);margin:16px 0}
-.qr-number{font-family:'Fraunces',serif;font-size:32px;font-weight:800;color:var(--green);margin:10px 0}
+.qr-section{text-align:center;padding:24px}
+.qr-code{display:inline-block;padding:16px;background:#fff;border-radius:12px;margin:14px 0;max-width:100%}
+.qr-code img,.qr-code canvas{max-width:100%;height:auto}
+.qr-number{font-family:'Fraunces',serif;font-size:30px;font-weight:800;color:var(--green);margin:10px 0;letter-spacing:1px}
 .qr-note{font-size:12px;color:var(--muted)}
+.stand-banner{padding:22px 18px;margin-bottom:16px}
 .links a{display:inline-block;color:var(--green);font-weight:600;font-size:12px;margin:0 12px 6px 0;text-decoration:none;border-bottom:1px solid currentColor}
 .links a:hover{opacity:.7}
 .info-section h3{font-family:'Fraunces',serif;font-size:18px;margin-bottom:10px}
@@ -109,7 +114,21 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .prize-name{font-size:18px;font-weight:800;color:var(--green)}
 .prize-desc{font-size:12px;color:var(--muted);margin-top:2px}
 .sent-ok{display:inline-block;background:var(--green-light);color:var(--green);font-size:11px;font-weight:700;padding:4px 12px;border-radius:12px;margin-top:8px}
-@media(max-width:600px){.app{padding:10px}.card,.fb-item{padding:18px}}
+@media(max-width:600px){
+  .app{padding:10px}
+  .card,.fb-item{padding:18px}
+  .hdr{padding:24px 10px 18px}
+  .res-hero{padding:24px 16px}
+  .res-hero h2{font-size:22px}
+  .stand-banner{padding:18px 14px}
+  .stand-banner div[style*="font-size:22px"]{font-size:19px!important}
+  .qr-number{font-size:26px}
+  .qr-section{padding:20px 14px}
+  .nav{flex-direction:row}
+  .nav .btn{flex:1;padding:14px 14px;font-size:14px}
+  .opts{gap:10px}
+  .prog-wrap{padding:8px 0 6px}
+}
 @media print{
   .no-print{display:none!important}
   .card{box-shadow:none;break-inside:avoid;border:1px solid #ddd}
@@ -444,7 +463,8 @@ function pickRandomPrizeType(){return PRIZE_TYPES[Math.floor(Math.random()*PRIZE
 // âââââââââââââââââââââââââââââââââââââââââââ
 // STATE
 // âââââââââââââââââââââââââââââââââââââââââââ
-let S={screen:'intro',cq:0,ans:{},name:'',prizeCode:'',prizeType:0,teacherFamily:null};
+let S={screen:'intro',cq:0,ans:{},email:'',prizeCode:'',prizeType:0,familyKey:'',locked:false,teacherFamily:null};
+const LS_EMAIL='lbc_email';
 const $=id=>document.getElementById(id);
 const app=document.getElementById('app');
 
@@ -478,9 +498,8 @@ function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='LBC-';for(l
 // âââââââââââââââââââââââââââââââââââââââââââ
 // ENVÃO A GOOGLE SHEETS
 // âââââââââââââââââââââââââââââââââââââââââââ
-function enviarResultados(){
-  if(!BACKEND_URL)return; // Sin backend configurado, no envía
-
+async function enviarResultados(){
+  if(!BACKEND_URL)return null;
   const{pcts}=getScores();
   const ss=getSoftScores();
   const sorted=Object.entries(pcts).sort((a,b)=>b[1]-a[1]);
@@ -492,7 +511,10 @@ function enviarResultados(){
   function ssPct(k){const v=ss[k];return v&&v.m>0?Math.round(v.s/v.m*100):0}
 
   const payload={
-    nombre:S.name,codigoPremio:S.prizeCode,tipoPremio:S.prizeType,
+    email:S.email,
+    answers:S.ans,
+    codigoPremio:S.prizeCode,tipoPremio:S.prizeType,
+    familyKey:S.familyKey,
     familia1:FAM[sorted[0][0]].nombre,pctFamilia1:sorted[0][1],
     familia2:FAM[sorted[1][0]].nombre,pctFamilia2:sorted[1][1],
     correctas,totalEvaluables:totalEval,
@@ -504,9 +526,16 @@ function enviarResultados(){
     adaptabilidad:ssPct('adaptabilidad'),pensamientoCritico:ssPct('pensamiento_critico')
   };
 
-  apiCall('submitResults',payload)
-  .then(()=>{const el=$('sentStatus');if(el)el.innerHTML='<span class="sent-ok">✅ Datos guardados correctamente</span>'})
-  .catch(err=>console.log('Error enviando:',err));
+  try{
+    const data=await apiCall('submitResults',payload);
+    const el=$('sentStatus');
+    if(el)el.innerHTML='<span class="sent-ok">✅ Datos guardados correctamente</span>';
+    return data;
+  }catch(err){
+    const el=$('sentStatus');
+    if(el)el.innerHTML='<span class="sent-ok" style="background:var(--red-light);color:var(--red)">⚠️ No se pudieron guardar los datos: '+err.message+'</span>';
+    return null;
+  }
 }
 
 // âââââââââââââââââââââââââââââââââââââââââââ
@@ -514,7 +543,7 @@ function enviarResultados(){
 // âââââââââââââââââââââââââââââââââââââââââââ
 function render(){
   if(S.screen==='intro')renderIntro();
-  else if(S.screen==='name')renderName();
+  else if(S.screen==='email')renderEmail();
   else if(S.screen==='quiz')renderQuiz();
   else if(S.screen==='results')renderResults();
   else if(S.screen==='teacherLogin')renderTeacherLogin();
@@ -540,7 +569,7 @@ function renderIntro(){
       <span class="chip c-electro">⚡ Electricidad</span>
       <span class="chip c-textil">🧵 Textil</span>
     </div>
-    <button class="btn" onclick="S.screen='name';render()">Comenzar el test →</button>
+    <button class="btn btn-full" onclick="S.screen='email';render()">Comenzar el test →</button>
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
       <button class="btn btn-outline" onclick="S.screen='teacherLogin';render()" style="font-size:13px">🔐 Acceso Profesor · Lector QR</button>
     </div>
@@ -548,23 +577,72 @@ function renderIntro(){
   <p class="footer">⏱ 10-15 min · 50 preguntas · Resultados inmediatos con premio</p>`;
 }
 
-function renderName(){
+function renderEmail(){
   app.innerHTML=`
-  <div class="hdr"><h1>¿Cómo te llamas?</h1><p>Tu nombre aparecerá en el informe de resultados.</p></div>
-  <div class="card" style="text-align:center">
-    <input id="nameInput" type="text" placeholder="Escribe tu nombre..."
-      style="width:100%;padding:14px;border:2px solid var(--border);border-radius:10px;font-family:'Outfit';font-size:16px;text-align:center;outline:none"
+  <div class="hdr">
+    <h1>Identifícate</h1>
+    <p>Usa tu correo electrónico habitual. Si ya has hecho el test antes, recuperaremos tus resultados.</p>
+  </div>
+  <div class="card">
+    <label for="emailInput" style="display:block;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Correo electrónico</label>
+    <input id="emailInput" type="email" inputmode="email" autocomplete="email"
+      autocapitalize="off" autocorrect="off" spellcheck="false"
+      placeholder="tucorreo@ejemplo.com"
+      value="${(S.email||'').replace(/"/g,'&quot;')}"
+      style="width:100%;padding:14px;border:2px solid var(--border);border-radius:10px;font-family:'Outfit';font-size:16px;outline:none;-webkit-appearance:none"
       onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'"
-      onkeypress="if(event.key==='Enter')startQuiz()">
-    <br><br><button class="btn" onclick="startQuiz()">Empezar →</button>
-  </div>`;
-  setTimeout(()=>{const i=$('nameInput');if(i)i.focus()},100);
+      onkeypress="if(event.key==='Enter')submitEmail()">
+    <p id="emailErr" style="color:var(--red);font-size:13px;margin-top:8px;min-height:18px"></p>
+    <button id="emailBtn" class="btn btn-full" style="margin-top:6px" onclick="submitEmail()">Continuar →</button>
+    <button class="btn btn-outline btn-full" style="margin-top:8px" onclick="S.screen='intro';render()">← Volver</button>
+  </div>
+  <p class="footer">🔒 Sólo guardamos tu correo para mostrarte tus resultados en futuras visitas.</p>`;
+  setTimeout(()=>{const i=$('emailInput');if(i)i.focus()},100);
 }
 
-function startQuiz(){
-  const i=$('nameInput');S.name=i?i.value.trim()||'Alumno/a':'Alumno/a';
-  S.screen='quiz';S.cq=0;S.ans={};render();
+function validEmail(e){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)}
+
+window.submitEmail=async function(){
+  const i=$('emailInput');
+  const err=$('emailErr');
+  const btn=$('emailBtn');
+  const email=(i?i.value:'').trim().toLowerCase();
+  if(!validEmail(email)){err.textContent='Introduce un correo electrónico válido.';return}
+  err.textContent='';
+  if(btn){btn.disabled=true;btn.textContent='Comprobando…'}
+  try{
+    const data=await apiCall('getMyResults',{email});
+    if(data.found){
+      loadResultIntoState(email,data.result);
+      try{localStorage.setItem(LS_EMAIL,email)}catch(e){}
+      S.screen='results';S.locked=true;
+      render();window.scrollTo({top:0,behavior:'smooth'});
+      return;
+    }
+    // No existe → empezar test
+    S.email=email;S.ans={};S.cq=0;S.locked=false;
+    S.prizeCode='';S.prizeType=0;S.familyKey='';
+    try{localStorage.setItem(LS_EMAIL,email)}catch(e){}
+    S.screen='quiz';render();
+  }catch(e){
+    err.textContent='Error de conexión: '+e.message;
+    if(btn){btn.disabled=false;btn.textContent='Continuar →'}
+  }
+};
+
+function loadResultIntoState(email,r){
+  S.email=email;
+  S.ans=r.answers||{};
+  S.prizeCode=r.prizeCode||'';
+  S.prizeType=parseInt(r.prizeType,10)||0;
+  S.familyKey=r.familyKey||'';
 }
+
+window.logoutStudent=function(){
+  try{localStorage.removeItem(LS_EMAIL)}catch(e){}
+  S.email='';S.ans={};S.cq=0;S.prizeCode='';S.prizeType=0;S.familyKey='';S.locked=false;
+  S.screen='intro';render();window.scrollTo({top:0,behavior:'smooth'});
+};
 
 function renderQuiz(){
   const q=QS[S.cq],tot=QS.length,pct=Math.round(S.cq/tot*100);
@@ -595,7 +673,24 @@ function renderQuiz(){
 function pick(i){S.ans[QS[S.cq].id]=i;render()}
 function next(){if(S.cq<QS.length-1){S.cq++;render();window.scrollTo({top:0,behavior:'smooth'})}}
 function prev(){if(S.cq>0){S.cq--;render();window.scrollTo({top:0,behavior:'smooth'})}}
-function finish(){S.screen='results';S.prizeCode=genCode();S.prizeType=pickRandomPrizeType();enviarResultados();render();window.scrollTo({top:0,behavior:'smooth'})}
+async function finish(){
+  const {pcts}=getScores();
+  const sorted=Object.entries(pcts).sort((a,b)=>b[1]-a[1]);
+  S.familyKey=sorted[0][0];
+  S.prizeCode=genCode();
+  S.prizeType=pickRandomPrizeType();
+  S.screen='results';S.locked=true;
+  render();window.scrollTo({top:0,behavior:'smooth'});
+  // Persistir en segundo plano
+  try{
+    const data=await enviarResultados();
+    if(data&&data.alreadyExists&&data.result){
+      // Ya había un resultado previo: usamos ese (respetamos el bloqueo server-side)
+      loadResultIntoState(S.email,data.result);
+      render();
+    }
+  }catch(e){console.log('submit error',e.message)}
+}
 
 // âââââââââââââââââââââââââââââââââââââââââââ
 // RESULTS
@@ -603,7 +698,9 @@ function finish(){S.screen='results';S.prizeCode=genCode();S.prizeType=pickRando
 function renderResults(){
   const{pcts}=getScores();const ss=getSoftScores();
   const sorted=Object.entries(pcts).sort((a,b)=>b[1]-a[1]);
-  const wk=sorted[0][0],w=FAM[wk],sk2=sorted[1][0];
+  const wk=S.familyKey||sorted[0][0];
+  const w=FAM[wk]||FAM[sorted[0][0]];
+  const sk2=sorted[0][0]===wk?sorted[1][0]:sorted[0][0];
   let totalCorrect=0,totalGraded=0;
   QS.forEach(q=>{const hasC=q.options.some(o=>o.correct);if(hasC){totalGraded++;if(S.ans[q.id]!==undefined&&q.options[S.ans[q.id]].correct)totalCorrect++}});
 
@@ -620,9 +717,15 @@ function renderResults(){
     <div class="card res-hero">
       <div class="emo">${w.emoji}</div>
       <h2>${w.nombre}</h2>
-      <p class="sub">Tu familia profesional recomendada · ${S.name}</p>
+      <p class="sub">Tu familia profesional recomendada · ${S.email}</p>
       <p style="margin-top:10px;font-size:14px;color:var(--green);font-weight:700">${totalCorrect} de ${totalGraded} respuestas correctas en soft skills (${totalGraded>0?Math.round(totalCorrect/totalGraded*100):0}%)</p>
       <div id="sentStatus"></div>
+    </div>
+
+    <div class="card stand-banner" style="border:2px solid var(--${wk});background:var(--surface);text-align:center">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--${wk})">Recoge tu premio</div>
+      <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:800;margin:6px 0 4px;line-height:1.2">🎁 Ve al stand de ${w.emoji} ${w.nombre}</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:0">Muestra el código QR de más abajo al profesor/a del stand y te entregará tu premio.</p>
     </div>
 
     <div class="card">${sorted.map(([k,p])=>`
@@ -684,12 +787,12 @@ function renderResults(){
       <div class="links" style="margin-top:10px"><a href="${FAM[sk2].url}" target="_blank">Departamento IES</a></div>
     </div>`:''}
 
-    <div class="card qr-section">
-      <h3 style="font-family:'Fraunces',serif;font-size:20px;margin-bottom:4px">🎁 ¡Tu premio!</h3>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:6px">Muestra este código QR a tu profesor/a para descubrir tu premio.</p>
+    <div class="card qr-section" style="border:2px solid var(--${wk})">
+      <h3 style="font-family:'Fraunces',serif;font-size:20px;margin-bottom:4px">🎁 Tu código QR del premio</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:6px">Ve al stand de <strong>${w.emoji} ${w.nombre}</strong> y muestra este QR al profesor/a.</p>
       <div class="qr-number">${S.prizeCode}</div>
       <div class="qr-code" id="qrCodeDiv"></div>
-      <p class="qr-note">El profesor/a escaneará este QR con el panel docente.</p>
+      <p class="qr-note">Este QR sólo se puede canjear una vez.</p>
     </div>
 
     <div class="card info-section">
@@ -702,16 +805,16 @@ function renderResults(){
       </div>
     </div>
 
-    <button class="btn btn-dark" style="width:100%" onclick="S.screen='intro';render()">🔄 Repetir el test</button>
-    <button class="btn btn-outline no-print" style="width:100%;margin-top:8px" onclick="window.print()">🖨️ Imprimir informe</button>
-    <p class="footer">IES Luis Bueno Crespo · Avda. Las Palmeras s/n · 18100 Armilla · ☎ 958 89 37 39</p>
+    <button class="btn btn-outline btn-full no-print" onclick="window.print()">🖨️ Imprimir / descargar informe</button>
+    <button class="btn btn-outline btn-full no-print" style="margin-top:8px" onclick="logoutStudent()">🔄 Cambiar de usuario</button>
+    <p class="footer">IES Luis Bueno Crespo · Avda. Las Palmeras s/n · 18100 Armilla · ☎ 958 89 37 39<br>Este test sólo se realiza una vez por correo.</p>
   </div>`;
 
   setTimeout(()=>{
     const qd=$('qrCodeDiv');
     if(qd&&typeof QRCode!=='undefined'){
       qd.innerHTML='';
-      new QRCode(qd,{text:JSON.stringify({code:S.prizeCode,name:S.name,family:w.nombre,familyKey:wk,score:sorted[0][1],prizeType:S.prizeType,date:new Date().toISOString().split('T')[0]}),width:180,height:180,colorDark:"#1b1b1f",colorLight:"#ffffff"});
+      new QRCode(qd,{text:JSON.stringify({code:S.prizeCode,email:S.email,family:w.nombre,familyKey:wk,score:sorted[0][1],prizeType:S.prizeType,date:new Date().toISOString().split('T')[0]}),width:220,height:220,colorDark:"#1b1b1f",colorLight:"#ffffff"});
     }
   },200);
   setTimeout(()=>renderFeedback('all'),50);
@@ -970,6 +1073,19 @@ async function redeemPrize(info,tid){
   const t=$(tid);
   const fk=S.teacherFamily;
   const pt=parseInt(info.prizeType,10);
+
+  // Chequeo cliente: el QR debe pertenecer a la familia del profe que escanea
+  if(info.familyKey && info.familyKey!==fk){
+    const targetFam=FAM[info.familyKey];
+    const targetLabel=targetFam?(targetFam.emoji+' '+targetFam.nombre):info.familyKey;
+    t.innerHTML=`<div class="card" style="border:2px solid var(--amber);text-align:left">
+      <h3 style="font-family:'Fraunces',serif;font-size:16px;color:var(--amber);margin-bottom:8px">⚠️ Stand incorrecto</h3>
+      <p style="font-size:13px">Este QR pertenece al stand de <strong>${targetLabel}</strong>.</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:6px">Indica al alumno/a que vaya a ese stand para recoger su premio. No se ha descontado nada del stock.</p>
+    </div>`;
+    return;
+  }
+
   t.innerHTML=`<div class="card" style="text-align:center"><p style="color:var(--muted)">Canjeando premio…</p></div>`;
 
   let data;
@@ -977,12 +1093,24 @@ async function redeemPrize(info,tid){
     data=await apiCall('redeem',{
       password:teacherPassword,
       family:fk,
+      qrFamilyKey:info.familyKey||fk,
       prizeType:pt,
       code:info.code,
-      studentName:info.name||''
+      studentName:info.email||info.name||''
     });
   }catch(e){
     t.innerHTML=`<div class="card" style="border:2px solid var(--red)"><p style="color:var(--red);font-weight:600">⚠️ Error de conexión: ${e.message}</p></div>`;
+    return;
+  }
+
+  if(data.wrongStand){
+    const targetFam=FAM[data.expectedFamily];
+    const targetLabel=targetFam?(targetFam.emoji+' '+targetFam.nombre):data.expectedFamily;
+    t.innerHTML=`<div class="card" style="border:2px solid var(--amber);text-align:left">
+      <h3 style="font-family:'Fraunces',serif;font-size:16px;color:var(--amber);margin-bottom:8px">⚠️ Stand incorrecto</h3>
+      <p style="font-size:13px">Este QR pertenece al stand de <strong>${targetLabel}</strong>.</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:6px">Indícale que vaya a ese stand.</p>
+    </div>`;
     return;
   }
 
@@ -999,12 +1127,11 @@ async function redeemPrize(info,tid){
     stockNote=`<p style="font-size:12px;color:var(--red);margin-top:6px">⚠️ Sin stock disponible de tipo ${pt}. Asigna otro premio manualmente.</p>`;
   }
 
-  const familyMatch=info.familyKey===fk;
   t.innerHTML=`<div class="card" style="border:2px solid var(--green);margin-bottom:0">
     <h3 style="font-family:'Fraunces',serif;font-size:18px;color:var(--green);margin-bottom:10px">🎓 Datos del alumno/a</h3>
-    <p style="font-size:13px"><strong>Nombre:</strong> ${info.name||'—'}</p>
+    <p style="font-size:13px;word-break:break-all"><strong>Correo:</strong> ${info.email||info.name||'—'}</p>
     <p style="font-size:13px"><strong>Código:</strong> ${info.code||'—'}</p>
-    <p style="font-size:13px"><strong>Familia recomendada:</strong> ${info.family||'—'} ${familyMatch?'✓':'<span style="color:var(--amber);font-size:11px">(distinta de tu panel)</span>'}</p>
+    <p style="font-size:13px"><strong>Familia recomendada:</strong> ${info.family||'—'} ✓</p>
     <p style="font-size:13px"><strong>Puntuación:</strong> ${info.score||'—'}%</p>
     <p style="font-size:13px"><strong>Fecha:</strong> ${info.date||'—'}</p>
     <div style="margin-top:14px;padding:18px;background:var(--green-light);border-radius:10px;text-align:center">
@@ -1039,7 +1166,21 @@ window.manualLookup=function(){
   </div>`;
 };
 
-render();
+async function bootstrap(){
+  render(); // pinta la intro mientras resolvemos
+  let saved='';
+  try{saved=localStorage.getItem(LS_EMAIL)||''}catch(e){}
+  if(!saved||!BACKEND_URL)return;
+  try{
+    const data=await apiCall('getMyResults',{email:saved});
+    if(data.found){
+      loadResultIntoState(saved,data.result);
+      S.screen='results';S.locked=true;
+      render();
+    }
+  }catch(e){/* silencioso: quedamos en intro */}
+}
+bootstrap();
 </script>
 </body>
 </html>

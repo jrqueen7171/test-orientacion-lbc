@@ -16,6 +16,11 @@ const SHEET_ID = process.env.SHEET_ID || '';
 const db = new Firestore();
 const STOCK_DOC = db.collection('lbc_orientacion').doc('stock');
 const SCANS_COL = db.collection('lbc_orientacion_scans');
+const RESULTS_COL = db.collection('lbc_orientacion_results');
+
+function normalizeEmail(v) {
+  return String(v || '').trim().toLowerCase();
+}
 
 const app = express();
 app.use(express.text({ type: '*/*', limit: '100kb' }));
@@ -48,6 +53,7 @@ app.post(['/', '/api'], async (req, res) => {
       case 'updatePrize':   result = await actionUpdatePrize(body); break;
       case 'redeem':        result = await actionRedeem(body); break;
       case 'submitResults': result = await actionSubmitResults(body); break;
+      case 'getMyResults':  result = await actionGetMyResults(body); break;
       default:              result = { ok: false, error: 'accion desconocida: ' + action };
     }
     res.json(result);
@@ -139,6 +145,17 @@ async function actionRedeem(body) {
   const code = String(body.code || '').trim();
   if (!code) return { ok: false, error: 'código vacío' };
 
+  // Si el QR lleva familyKey, debe coincidir con la familia del profesor
+  // (cada stand sólo canjea los premios de su propia familia)
+  if (body.qrFamilyKey && body.qrFamilyKey !== f) {
+    return {
+      ok: true,
+      wrongStand: true,
+      expectedFamily: body.qrFamilyKey,
+      teacherFamily: f,
+    };
+  }
+
   const scanRef = SCANS_COL.doc(code);
 
   const result = await db.runTransaction(async (tx) => {
@@ -190,38 +207,94 @@ async function actionRedeem(body) {
 }
 
 async function actionSubmitResults(body) {
-  // endpoint público, no requiere auth — sólo escribe en la Sheet
+  // Endpoint público. Guarda en Firestore (para bloquear retakes y permitir
+  // re-abrir resultados) y apila una fila en la Google Sheet (audit/export).
   try {
-    if (!SHEET_ID) return { ok: true, note: 'sin hoja configurada' };
-    const sheets = await getSheets();
-    await ensureSheet(sheets, 'resultados', [
-      'timestamp', 'nombre', 'codigo', 'tipoPremio',
-      'familia1', 'pct1', 'familia2', 'pct2',
-      'correctas', 'total', 'pctAcierto',
-      'puntualidad', 'asertividad', 'donGentes', 'resolucionConflictos',
-      'negociacion', 'organizacion', 'creatividad', 'trabajoEquipo',
-      'adaptabilidad', 'pensamientoCritico',
-    ]);
-    const row = [
-      new Date().toISOString(),
-      body.nombre || '', body.codigoPremio || '', body.tipoPremio || '',
-      body.familia1 || '', body.pctFamilia1 || 0,
-      body.familia2 || '', body.pctFamilia2 || 0,
-      body.correctas || 0, body.totalEvaluables || 0, body.pctAcierto || 0,
-      body.puntualidad || 0, body.asertividad || 0, body.donGentes || 0, body.resolucionConflictos || 0,
-      body.negociacion || 0, body.organizacion || 0, body.creatividad || 0, body.trabajoEquipo || 0,
-      body.adaptabilidad || 0, body.pensamientoCritico || 0,
-    ];
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
-      range: 'resultados!A:U',
-      valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [row] },
-    });
-    return { ok: true };
+    const email = normalizeEmail(body.email);
+    if (!email) return { ok: false, error: 'email obligatorio' };
+
+    const ref = RESULTS_COL.doc(email);
+    const snap = await ref.get();
+    if (snap.exists) {
+      // Ya hizo el test: devolvemos lo que había, sin sobrescribir ni reescribir Sheet
+      return { ok: true, alreadyExists: true, result: snap.data() };
+    }
+
+    const doc = {
+      email,
+      answers: body.answers || {},
+      prizeCode: body.codigoPremio || '',
+      prizeType: parseInt(body.tipoPremio, 10) || 0,
+      familyKey: body.familyKey || '',
+      familia1: body.familia1 || '',
+      pctFamilia1: body.pctFamilia1 || 0,
+      familia2: body.familia2 || '',
+      pctFamilia2: body.pctFamilia2 || 0,
+      correctas: body.correctas || 0,
+      totalEvaluables: body.totalEvaluables || 0,
+      pctAcierto: body.pctAcierto || 0,
+      soft: {
+        puntualidad: body.puntualidad || 0,
+        asertividad: body.asertividad || 0,
+        donGentes: body.donGentes || 0,
+        resolucionConflictos: body.resolucionConflictos || 0,
+        negociacion: body.negociacion || 0,
+        organizacion: body.organizacion || 0,
+        creatividad: body.creatividad || 0,
+        trabajoEquipo: body.trabajoEquipo || 0,
+        adaptabilidad: body.adaptabilidad || 0,
+        pensamientoCritico: body.pensamientoCritico || 0,
+      },
+      timestamp: new Date().toISOString(),
+    };
+    await ref.set(doc);
+
+    // Audit log en Google Sheet (best-effort, no rompe si falla)
+    if (SHEET_ID) {
+      appendResultsRow(body, email).catch((e) => console.log('sheet results log error:', e.message));
+    }
+
+    return { ok: true, result: doc };
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
+}
+
+async function actionGetMyResults(body) {
+  // Endpoint público. Lookup por email, sin contraseña — contexto escolar.
+  const email = normalizeEmail(body.email);
+  if (!email) return { ok: false, error: 'email obligatorio' };
+  const snap = await RESULTS_COL.doc(email).get();
+  if (!snap.exists) return { ok: true, found: false };
+  return { ok: true, found: true, result: snap.data() };
+}
+
+async function appendResultsRow(body, email) {
+  const sheets = await getSheets();
+  await ensureSheet(sheets, 'resultados', [
+    'timestamp', 'email', 'codigo', 'tipoPremio', 'familyKey',
+    'familia1', 'pct1', 'familia2', 'pct2',
+    'correctas', 'total', 'pctAcierto',
+    'puntualidad', 'asertividad', 'donGentes', 'resolucionConflictos',
+    'negociacion', 'organizacion', 'creatividad', 'trabajoEquipo',
+    'adaptabilidad', 'pensamientoCritico',
+  ]);
+  const row = [
+    new Date().toISOString(),
+    email, body.codigoPremio || '', body.tipoPremio || '', body.familyKey || '',
+    body.familia1 || '', body.pctFamilia1 || 0,
+    body.familia2 || '', body.pctFamilia2 || 0,
+    body.correctas || 0, body.totalEvaluables || 0, body.pctAcierto || 0,
+    body.puntualidad || 0, body.asertividad || 0, body.donGentes || 0, body.resolucionConflictos || 0,
+    body.negociacion || 0, body.organizacion || 0, body.creatividad || 0, body.trabajoEquipo || 0,
+    body.adaptabilidad || 0, body.pensamientoCritico || 0,
+  ];
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: 'resultados!A:V',
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [row] },
+  });
 }
 
 async function appendScanLog(body, prizeName) {
