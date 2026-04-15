@@ -125,9 +125,9 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 // ════════════════════════════════════════════════════════
 //   CONFIGURACIÓN — CAMBIA SOLO ESTA LÍNEA
 // ════════════════════════════════════════════════════════
-// Pega aquí la URL de tu Google Apps Script Web App (guía en apps-script.gs)
-// Ejemplo: const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbx.../exec';
-const BACKEND_URL = '';
+// Endpoint del backend (Cloud Run, Klasvid GCP, europe-west1)
+// Guía para redesplegar en backend/README e backend/deploy.sh
+const BACKEND_URL = 'https://lbc-orientacion-993870750225.europe-west1.run.app/api';
 
 // Llama al backend. Usa text/plain para evitar preflight CORS.
 async function apiCall(action, body){
