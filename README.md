@@ -16,32 +16,63 @@
 - Perfil completo de competencias transversales
 - Sistema de **premios con código QR** (3 tipos por familia)
 - **Panel docente** con lector QR integrado y contraseña
-- **Contadores en la nube** (Google Apps Script) — varios profesores de la misma familia comparten el stock en tiempo real
-- Descuentos atómicos con bloqueo (`LockService`) y protección contra canjes duplicados
-- Envío automático de resultados a Google Sheets
+- **Contadores en la nube** (Firestore) — varios profesores de la misma familia comparten el stock en tiempo real
+- Descuentos atómicos con `runTransaction` y protección contra canjes duplicados
+- Log de escaneos y resultados en una Google Sheet
 - Diseño responsive (móvil, tablet, PC)
 - Botón de impresión de informe
 
 ## Arquitectura
 - **Frontend**: un único `index.html` (sin dependencias) servido por GitHub Pages.
-- **Backend**: Google Apps Script (`apps-script.gs`) desplegado como Web App. Almacena stock, contraseña y códigos canjeados en *Script Properties*, y registra escaneos/resultados en una Google Sheet.
+- **Backend**: servicio Node.js + Express desplegado en **Cloud Run** (`europe-west1`), reutilizando el proyecto GCP de Klasvid. Código en [backend/](backend/).
+  - **Firestore** (nativo) → stock de premios y códigos canjeados (operaciones atómicas).
+  - **Google Sheets** → log de escaneos (`escaneos`) y resultados del test (`resultados`).
+  - **Secret Manager** → contraseña del profesor, inyectada como env var.
 
-## Despliegue del backend (Google Apps Script)
+## Despliegue del backend
 
-1. Crea una Google Sheet vacía y copia su **ID** (la parte larga entre `/d/` y `/edit` en la URL).
-2. Ve a [script.google.com](https://script.google.com/) y crea un proyecto nuevo.
-3. Pega el contenido completo de [apps-script.gs](apps-script.gs) en `Code.gs` (sustituyendo el contenido por defecto).
-4. En el menú: **Configuración del proyecto → Propiedades del script** → añade dos propiedades:
-   - `TEACHER_PASSWORD` = `profesor26` (o la que prefieras)
-   - `SHEET_ID` = el ID de la Sheet del paso 1
-5. **Implementar → Nueva implementación** → tipo **Aplicación web**:
-   - *Ejecutar como*: yo
-   - *Quién tiene acceso*: cualquier usuario
-6. Copia la URL de la Web App que te devuelve.
-7. En `index.html`, busca la constante `BACKEND_URL` (al principio del `<script>`) y pega la URL.
-8. Haz commit y push a GitHub Pages.
+### 1. Preparar la Google Sheet
+Crea una Google Sheet vacía y copia su **ID** (parte entre `/d/` y `/edit` en la URL). Las pestañas `resultados` y `escaneos` se crean automáticamente la primera vez que se escribe en ellas.
 
-> ⚠️ **Importante**: cada vez que modifiques `apps-script.gs`, tienes que crear una **nueva versión** de la implementación (*Implementar → Gestionar implementaciones → ✏️ → Nueva versión*) para que los cambios entren en producción.
+### 2. Preparar gcloud
+```bash
+gcloud auth login
+gcloud config set project <id-del-proyecto-klasvid>
+```
+
+Si Firestore aún no está inicializado en el proyecto:
+```bash
+gcloud firestore databases create --location=eur3
+```
+
+### 3. Desplegar
+```bash
+cd backend
+export SHEET_ID="id-de-tu-google-sheet"
+# opcional — por defecto usa "profesor26":
+# export TEACHER_PASSWORD="otra-clave"
+./deploy.sh
+```
+
+El script:
+- Habilita las APIs necesarias (Cloud Run, Cloud Build, Firestore, Sheets, Secret Manager).
+- Crea el secreto `lbc-teacher-password` (si no existe) con la contraseña.
+- Da permisos al service account por defecto de Cloud Run para leer el secreto.
+- Despliega el servicio en `europe-west1` con autoescalado 0→5 instancias.
+- Imprime al final la URL pública y el service account.
+
+### 4. Compartir la Sheet con el service account
+El script imprime un email tipo `NÚMERO-compute@developer.gserviceaccount.com`. Ve a la Sheet → **Compartir** → añádelo como **Editor**. Sin esto, `submitResults` y el log de escaneos fallarán.
+
+### 5. Conectar el frontend
+Copia la URL que imprimió el script y pégala en [index.html](index.html) (busca `const BACKEND_URL`):
+```js
+const BACKEND_URL = 'https://lbc-orientacion-XXXX-ew.a.run.app/api';
+```
+Haz commit y push. GitHub Pages servirá la versión nueva en segundos.
+
+### Redeploy tras cambios
+Basta con volver a ejecutar `./deploy.sh` desde `backend/`.
 
 ## Uso
 - **Alumnado**: entra en la URL pública, hace el test y obtiene un QR con su premio.

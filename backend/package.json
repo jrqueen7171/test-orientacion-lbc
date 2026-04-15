@@ -1,0 +1,17 @@
+{
+  "name": "lbc-orientacion-backend",
+  "version": "1.0.0",
+  "description": "Backend para el Test de Orientación Profesional IES Luis Bueno Crespo — Cloud Run + Firestore + Google Sheets",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.10.0",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0"
+  }
+}
