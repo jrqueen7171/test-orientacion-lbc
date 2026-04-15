@@ -412,36 +412,47 @@ idealExplanation:"El tipo de error que más te preocupa indica dónde pones tu m
 options:[{text:"Servicios financieros y gestión empresarial",scores:{admin:3,comercio:1,obra:0,electro:0,textil:0}},{text:"Comercio electrónico y logística internacional",scores:{admin:0,comercio:3,obra:0,electro:0,textil:0}},{text:"Construcción sostenible, telecomunicaciones y energías renovables",scores:{admin:0,comercio:0,obra:3,electro:3,textil:0}},{text:"Moda flamenca, artesanía textil y espectáculos",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
 idealExplanation:"Andalucía ofrece oportunidades en todos estos sectores. La clave es elegir lo que te apasione.",wrongExplanation:"Investiga el tejido empresarial de Granada. El IES tiene convenios con empresas locales para FCT."},
 
-{id:50,section:"tecnica",text:"Ãltima pregunta: ¿qué frase te define mejor?",
+{id:50,section:"tecnica",text:"Última pregunta: ¿qué frase te define mejor?",
 options:[{text:"\"Cada céntimo cuenta y cada documento importa\"",scores:{admin:3,comercio:0,obra:0,electro:0,textil:0}},{text:"\"Si sabes conectar con la gente, todo es posible\"",scores:{admin:0,comercio:3,obra:0,electro:0,textil:0}},{text:"\"Construyo y conecto el mundo que nos rodea\"",scores:{admin:0,comercio:0,obra:2,electro:3,textil:0}},{text:"\"La moda es arte que se viste\"",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
 idealExplanation:"Tu frase-identidad revela tu esencia profesional. No hay correcta ni incorrecta.",wrongExplanation:"Si ninguna te representa, quizá tengas perfil mixto. Explora ciclos de dos familias."}
 ];
 
-// âââââââââââââââââââââââââââââââââââââââââââ
-// PREMIOS
-// âââââââââââââââââââââââââââââââââââââââââââ
-const PRIZES=[
-  {emoji:'📓',name:'Cuaderno IES personalizado',desc:'Un cuaderno con el logo del centro.'},
-  {emoji:'🖊️',name:'Pack de bolígrafos premium',desc:'Set de bolígrafos de colores.'},
-  {emoji:'👜',name:'Bolsa IES Luis Bueno Crespo',desc:'Bolsa de tela exclusiva del centro.'},
-  {emoji:'☕',name:'Desayuno gratis en cafetería',desc:'Un desayuno completo en la cafetería.'},
-  {emoji:'📱',name:'Funda de móvil IES',desc:'Funda personalizada con el escudo.'},
-  {emoji:'🏆',name:'Diploma de Excelencia en Soft Skills',desc:'Certificado oficial del Dpto. de Orientación.'},
-  {emoji:'📖',name:'Libro recomendado por tu tutor/a',desc:'Un libro seleccionado por tu departamento.'},
-  {emoji:'🎫',name:'Entrada actividad extraescolar',desc:'Acceso gratuito a la próxima excursión.'},
-  {emoji:'🧢',name:'Gorra IES edición limitada',desc:'Gorra deportiva con el logo del centro.'},
-  {emoji:'⭐',name:'Punto extra en FOL/Tutoría',desc:'Un punto extra en participación de FOL.'}
-];
+// ═════════════════════════════════════════
+// SISTEMA DE PREMIOS (configurable por familia)
+// ═════════════════════════════════════════
+const TEACHER_PASSWORD = 'profesor26';
+const PRIZE_TYPES = [1,2,3];
+const DEFAULT_PRIZE_CONFIG = {
+  admin:    {names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'], counts:[10,5,2]},
+  comercio: {names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'], counts:[10,5,2]},
+  obra:     {names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'], counts:[10,5,2]},
+  electro:  {names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'], counts:[10,5,2]},
+  textil:   {names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'], counts:[10,5,2]}
+};
 
-function getPrize(code){
-  let h=0;for(let i=0;i<code.length;i++){h=((h<<5)-h)+code.charCodeAt(i);h|=0;}
-  return PRIZES[Math.abs(h)%PRIZES.length];
+function loadPrizeConfig(){
+  try{
+    const s=localStorage.getItem('lbc_prizeConfig');
+    if(s){
+      const parsed=JSON.parse(s);
+      // merge with defaults to handle new families
+      const merged=JSON.parse(JSON.stringify(DEFAULT_PRIZE_CONFIG));
+      Object.keys(parsed).forEach(k=>{if(merged[k])merged[k]=parsed[k]});
+      return merged;
+    }
+  }catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT_PRIZE_CONFIG));
 }
+function savePrizeConfig(c){try{localStorage.setItem('lbc_prizeConfig',JSON.stringify(c))}catch(e){}}
+function loadScanned(){try{return JSON.parse(localStorage.getItem('lbc_scannedCodes')||'{}')}catch(e){return{}}}
+function saveScanned(s){try{localStorage.setItem('lbc_scannedCodes',JSON.stringify(s))}catch(e){}}
+
+function pickRandomPrizeType(){return PRIZE_TYPES[Math.floor(Math.random()*PRIZE_TYPES.length)]}
 
 // âââââââââââââââââââââââââââââââââââââââââââ
 // STATE
 // âââââââââââââââââââââââââââââââââââââââââââ
-let S={screen:'intro',cq:0,ans:{},name:'',prizeCode:''};
+let S={screen:'intro',cq:0,ans:{},name:'',prizeCode:'',prizeType:0,teacherFamily:null};
 const $=id=>document.getElementById(id);
 const app=document.getElementById('app');
 
@@ -502,7 +513,7 @@ function enviarResultados(){
   };
 
   fetch(SHEETS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-  .then(()=>{const el=$('sentStatus');if(el)el.innerHTML='<span class="sent-ok">â Datos guardados correctamente</span>'})
+  .then(()=>{const el=$('sentStatus');if(el)el.innerHTML='<span class="sent-ok">✅ Datos guardados correctamente</span>'})
   .catch(err=>console.log('Error enviando:',err));
 }
 
@@ -514,6 +525,7 @@ function render(){
   else if(S.screen==='name')renderName();
   else if(S.screen==='quiz')renderQuiz();
   else if(S.screen==='results')renderResults();
+  else if(S.screen==='teacherLogin')renderTeacherLogin();
   else if(S.screen==='teacher')renderTeacher();
 }
 
@@ -526,8 +538,8 @@ function renderIntro(){
   </div>
   <div class="card">
     <h2 style="font-family:'Fraunces',serif;font-size:20px;margin-bottom:10px">¿Cómo funciona?</h2>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:8px"><strong>37 preguntas de Soft Skills</strong> â puntualidad, asertividad, don de gentes, resolución de conflictos, negociación y más.</p>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px"><strong>13 preguntas de Aptitudes Técnicas</strong> â identifican qué familia profesional encaja contigo.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:8px"><strong>37 preguntas de Soft Skills</strong> — puntualidad, asertividad, don de gentes, resolución de conflictos, negociación y más.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px"><strong>13 preguntas de Aptitudes Técnicas</strong> — identifican qué familia profesional encaja contigo.</p>
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Al finalizar: informe detallado con correcciones, perfil de soft skills, familia recomendada y <strong>código QR con premio</strong>.</p>
     <div class="chips">
       <span class="chip c-admin">📊 Administración</span>
@@ -538,7 +550,7 @@ function renderIntro(){
     </div>
     <button class="btn" onclick="S.screen='name';render()">Comenzar el test →</button>
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
-      <button class="btn btn-outline" onclick="S.screen='teacher';render()" style="font-size:13px">🔐 Acceso Profesor · Lector QR</button>
+      <button class="btn btn-outline" onclick="S.screen='teacherLogin';render()" style="font-size:13px">🔐 Acceso Profesor · Lector QR</button>
     </div>
   </div>
   <p class="footer">⏱ 10-15 min · 50 preguntas · Resultados inmediatos con premio</p>`;
@@ -591,7 +603,7 @@ function renderQuiz(){
 function pick(i){S.ans[QS[S.cq].id]=i;render()}
 function next(){if(S.cq<QS.length-1){S.cq++;render();window.scrollTo({top:0,behavior:'smooth'})}}
 function prev(){if(S.cq>0){S.cq--;render();window.scrollTo({top:0,behavior:'smooth'})}}
-function finish(){S.screen='results';S.prizeCode=genCode();enviarResultados();render();window.scrollTo({top:0,behavior:'smooth'})}
+function finish(){S.screen='results';S.prizeCode=genCode();S.prizeType=pickRandomPrizeType();enviarResultados();render();window.scrollTo({top:0,behavior:'smooth'})}
 
 // âââââââââââââââââââââââââââââââââââââââââââ
 // RESULTS
@@ -628,7 +640,7 @@ function renderResults(){
       </div>`).join('')}</div>
 
     <div class="card info-section">
-      <h3>ð§  Perfil de Soft Skills</h3>
+      <h3>🧠 Perfil de Soft Skills</h3>
       ${ssEntries.map(s=>{
         const cls=s.pct>=70?'good':s.pct>=50?'ok':'low';
         const label=s.pct>=70?'⭐ Fortaleza':s.pct>=50?'🟡 Mejorable':'🔴 A trabajar';
@@ -652,7 +664,7 @@ function renderResults(){
     ${weakAreas.length>0||okAreas.length>0?`
     <div class="card info-section">
       <h3>🎯 Tu Plan de Mejora Personal</h3>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Ãreas donde más impacto tendrá tu mejora:</p>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Áreas donde más impacto tendrá tu mejora:</p>
       ${weakAreas.map((s,i)=>`<div class="improve-box red"><strong>${i+1}. ${s.name} (${s.pct}%)</strong><p>${getImproveTip(s.k)}</p></div>`).join('')}
       ${okAreas.map((s,i)=>`<div class="improve-box amber"><strong>${weakAreas.length+i+1}. ${s.name} (${s.pct}%)</strong><p>${getImproveTip(s.k)}</p></div>`).join('')}
     </div>`:''}
@@ -707,7 +719,7 @@ function renderResults(){
     const qd=$('qrCodeDiv');
     if(qd&&typeof QRCode!=='undefined'){
       qd.innerHTML='';
-      new QRCode(qd,{text:JSON.stringify({code:S.prizeCode,name:S.name,family:w.nombre,score:sorted[0][1],date:new Date().toISOString().split('T')[0]}),width:180,height:180,colorDark:"#1b1b1f",colorLight:"#ffffff"});
+      new QRCode(qd,{text:JSON.stringify({code:S.prizeCode,name:S.name,family:w.nombre,familyKey:wk,score:sorted[0][1],prizeType:S.prizeType,date:new Date().toISOString().split('T')[0]}),width:180,height:180,colorDark:"#1b1b1f",colorLight:"#ffffff"});
     }
   },200);
   setTimeout(()=>renderFeedback('all'),50);
@@ -747,7 +759,7 @@ function renderFeedback(filter){
       <span class="fb-icon">${icon}</span>
       <div class="fb-q">${q.id}. ${q.text}</div>
       <div class="fb-ans yours"><div class="label">Tu respuesta${isC?' ✓':hasC?' ✗':''}</div>${chosenText}</div>
-      ${hasC&&correctOpt&&!isC?`<div class="fb-ans ideal"><div class="label" style="color:var(--green)">Respuesta recomendada â</div>${correctOpt.text}</div>`:''}
+      ${hasC&&correctOpt&&!isC?`<div class="fb-ans ideal"><div class="label" style="color:var(--green)">Respuesta recomendada ✓</div>${correctOpt.text}</div>`:''}
       <div class="fb-explain">${isC||!hasC?'<strong>'+(isC?'¡Correcto! ':'💡 Orientación: ')+'</strong>'+q.idealExplanation:'<strong>¿Cómo mejorar?</strong> '+q.wrongExplanation}</div>
     </div>`;
   });
@@ -759,47 +771,167 @@ window.setFilter=function(f){
   renderFeedback(f);
 };
 
-// âââââââââââââââââââââââââââââââââââââââââââ
-// TEACHER PANEL
-// âââââââââââââââââââââââââââââââââââââââââââ
-function renderTeacher(){
+// ═════════════════════════════════════════
+// TEACHER LOGIN
+// ═════════════════════════════════════════
+function renderTeacherLogin(){
   app.innerHTML=`
   <div class="hdr">
     <div class="hdr-badge">Panel Docente</div>
-    <h1>Lector de Códigos QR</h1>
-    <p>Escanea el QR del alumno/a para ver su código de premio.</p>
+    <h1>Acceso Profesor</h1>
+    <p>Introduce la contraseña y selecciona la familia profesional que gestionas.</p>
   </div>
+  <div class="card">
+    <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Contraseña</label>
+    <input id="teacherPass" type="password" placeholder="••••••••"
+      style="width:100%;padding:13px;border:2px solid var(--border);border-radius:10px;font-family:'Outfit';font-size:16px;outline:none;margin-bottom:18px"
+      onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'"
+      onkeypress="if(event.key==='Enter')teacherLogin()">
+    <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Familia profesional</label>
+    <div id="famPicker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">
+      ${Object.keys(FAM).map(k=>`
+        <button class="opt" data-fam="${k}" onclick="selectFam('${k}')" style="justify-content:flex-start">
+          <span class="opt-circle"></span>
+          <span>${FAM[k].emoji} ${FAM[k].nombre}</span>
+        </button>`).join('')}
+    </div>
+    <p id="loginErr" style="color:var(--red);font-size:13px;margin-bottom:10px;min-height:18px"></p>
+    <button class="btn" onclick="teacherLogin()" style="width:100%">Entrar al panel →</button>
+    <button class="btn btn-outline" style="width:100%;margin-top:8px" onclick="S.screen='intro';render()">← Volver al test</button>
+  </div>
+  <p class="footer">Panel exclusivo para profesorado del IES Luis Bueno Crespo</p>`;
+  setTimeout(()=>{const i=$('teacherPass');if(i)i.focus()},100);
+  // restore any previous selection visually
+  if(S.teacherFamily){const b=document.querySelector('[data-fam="'+S.teacherFamily+'"]');if(b)b.classList.add('sel')}
+}
+
+window.selectFam=function(k){
+  S.teacherFamily=k;
+  document.querySelectorAll('#famPicker .opt').forEach(b=>b.classList.toggle('sel',b.dataset.fam===k));
+};
+
+window.teacherLogin=function(){
+  const pw=($('teacherPass')||{}).value||'';
+  const err=$('loginErr');
+  if(pw!==TEACHER_PASSWORD){err.textContent='Contraseña incorrecta.';return}
+  if(!S.teacherFamily){err.textContent='Selecciona una familia profesional.';return}
+  err.textContent='';
+  S.screen='teacher';render();
+};
+
+// ═════════════════════════════════════════
+// TEACHER PANEL (menu + scanner)
+// ═════════════════════════════════════════
+function renderTeacher(){
+  const cfg=loadPrizeConfig();
+  const fk=S.teacherFamily;
+  const fam=FAM[fk];
+  const fc=cfg[fk];
+  app.innerHTML=`
+  <div class="hdr">
+    <div class="hdr-badge">Panel Docente · ${fam.nombre}</div>
+    <h1>${fam.emoji} ${fam.nombre}</h1>
+    <p>Gestión de premios y lector de códigos QR</p>
+  </div>
+
+  <div class="card">
+    <h3 style="font-family:'Fraunces',serif;font-size:18px;margin-bottom:4px">🎁 Stock de premios</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Edita el nombre y la cantidad disponible para cada tipo. Los cambios se guardan automáticamente.</p>
+    ${[0,1,2].map(i=>`
+      <div style="padding:14px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:10px;background:var(--bg)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:10px;font-weight:700;color:var(--green);letter-spacing:1.5px;text-transform:uppercase">Tipo ${i+1}</span>
+          <span style="font-size:24px;font-weight:800;color:var(--${fk});font-family:'Fraunces',serif" id="cnt-${i}">${fc.counts[i]}</span>
+        </div>
+        <input type="text" value="${(fc.names[i]||'').replace(/"/g,'&quot;')}" id="pname-${i}" placeholder="Nombre del premio"
+          style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:7px;font-family:'Outfit';font-size:13px;outline:none;margin-bottom:8px"
+          onchange="updatePrizeName(${i},this.value)"
+          onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'">
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-outline" style="padding:7px 12px;font-size:13px" onclick="adjustCount(${i},-1)">−</button>
+          <input type="number" value="${fc.counts[i]}" id="pcnt-${i}" min="0"
+            style="flex:1;padding:7px;border:1.5px solid var(--border);border-radius:7px;font-family:'Outfit';font-size:14px;text-align:center;outline:none"
+            onchange="setCount(${i},this.value)">
+          <button class="btn btn-outline" style="padding:7px 12px;font-size:13px" onclick="adjustCount(${i},1)">+</button>
+        </div>
+      </div>`).join('')}
+    <p style="font-size:11px;color:var(--muted);margin-top:4px">Total restante: <strong id="totalCount">${fc.counts.reduce((a,b)=>a+b,0)}</strong> premios</p>
+  </div>
+
   <div class="card" style="text-align:center">
+    <h3 style="font-family:'Fraunces',serif;font-size:18px;margin-bottom:10px">📷 Lector QR</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Escanea el QR del alumno/a. Al leerlo se descontará automáticamente un premio del stock.</p>
     <video id="teacherVideo" style="width:100%;max-width:400px;border-radius:12px;border:3px solid var(--green);margin:0 auto;display:block" playsinline></video>
     <canvas id="teacherCanvas" style="display:none"></canvas>
     <p id="scanStatus" style="margin-top:12px;font-size:14px;color:var(--muted)">Iniciando cámara...</p>
-    <div id="scanResult" style="margin-top:16px"></div>
+    <button class="btn btn-outline" style="margin-top:10px;padding:8px 16px;font-size:13px" onclick="restartScanner()">🔄 Reiniciar escáner</button>
+    <div id="scanResult" style="margin-top:16px;text-align:left"></div>
   </div>
+
   <div class="card" style="text-align:center">
-    <h3 style="font-family:'Fraunces',serif;font-size:18px;margin-bottom:10px">O introduce el código manualmente</h3>
+    <h3 style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:10px">O introduce el código manualmente</h3>
     <input id="manualCode" type="text" placeholder="Ej: LBC-A3K9N2"
-      style="width:100%;max-width:300px;padding:12px;border:2px solid var(--border);border-radius:10px;font-family:'Outfit';font-size:16px;text-align:center;outline:none;margin-bottom:12px"
+      style="width:100%;max-width:300px;padding:11px;border:2px solid var(--border);border-radius:10px;font-family:'Outfit';font-size:15px;text-align:center;outline:none;margin-bottom:10px"
       onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'">
     <br><button class="btn" onclick="manualLookup()">Buscar código</button>
-    <div id="manualResult" style="margin-top:16px"></div>
+    <div id="manualResult" style="margin-top:16px;text-align:left"></div>
   </div>
-  <button class="btn btn-outline" style="width:100%;margin-top:8px" onclick="stopCamera();S.screen='intro';render()">← Volver al test</button>
-  <p class="footer">Panel exclusivo para profesorado del IES Luis Bueno Crespo</p>`;
+
+  <button class="btn btn-outline" style="width:100%" onclick="teacherLogout()">🚪 Cerrar sesión</button>
+  <p class="footer">IES Luis Bueno Crespo · Panel Docente</p>`;
   startCamera();
+}
+
+window.teacherLogout=function(){stopCamera();S.teacherFamily=null;S.screen='intro';render()};
+
+window.updatePrizeName=function(idx,val){
+  const cfg=loadPrizeConfig();cfg[S.teacherFamily].names[idx]=val.trim()||('Premio tipo '+(idx+1));
+  savePrizeConfig(cfg);
+};
+
+window.setCount=function(idx,val){
+  const n=Math.max(0,parseInt(val,10)||0);
+  const cfg=loadPrizeConfig();cfg[S.teacherFamily].counts[idx]=n;savePrizeConfig(cfg);
+  refreshCounters();
+};
+
+window.adjustCount=function(idx,delta){
+  const cfg=loadPrizeConfig();
+  cfg[S.teacherFamily].counts[idx]=Math.max(0,(cfg[S.teacherFamily].counts[idx]||0)+delta);
+  savePrizeConfig(cfg);refreshCounters();
+};
+
+function refreshCounters(){
+  const cfg=loadPrizeConfig();const fc=cfg[S.teacherFamily];
+  [0,1,2].forEach(i=>{
+    const el=$('cnt-'+i);if(el)el.textContent=fc.counts[i];
+    const inp=$('pcnt-'+i);if(inp)inp.value=fc.counts[i];
+  });
+  const tot=$('totalCount');if(tot)tot.textContent=fc.counts.reduce((a,b)=>a+b,0);
 }
 
 let cameraStream=null,scanInterval=null;
 function startCamera(){
   const v=$('teacherVideo'),cn=$('teacherCanvas'),st=$('scanStatus');
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){st.textContent='â Cámara no soportada. Usa el campo manual.';return}
+  if(!v)return;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){st.textContent='⚠ Cámara no soportada. Usa el campo manual.';return}
   navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
   .then(stream=>{cameraStream=stream;v.srcObject=stream;v.play();st.textContent='📷 Cámara activa. Apunta al QR del alumno/a.';
+    if(typeof jsQR!=='undefined'){scanInterval=setInterval(()=>scanFrame(v,cn),300);return}
     const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
     sc.onload=()=>{scanInterval=setInterval(()=>scanFrame(v,cn),300)};
-    sc.onerror=()=>{st.textContent='â ï¸ No se pudo cargar el lector QR. Usa el campo manual.'};
+    sc.onerror=()=>{st.textContent='⚠️ No se pudo cargar el lector QR. Usa el campo manual.'};
     document.head.appendChild(sc);
-  }).catch(()=>{st.textContent='â ï¸ No se pudo acceder a la cámara. Usa el campo manual.'});
+  }).catch(()=>{st.textContent='⚠️ No se pudo acceder a la cámara. Usa el campo manual.'});
 }
+
+window.restartScanner=function(){
+  $('scanResult').innerHTML='';
+  const st=$('scanStatus');if(st)st.textContent='📷 Cámara activa. Apunta al QR del alumno/a.';
+  if(scanInterval)clearInterval(scanInterval);
+  const v=$('teacherVideo'),cn=$('teacherCanvas');
+  if(v&&cn&&typeof jsQR!=='undefined')scanInterval=setInterval(()=>scanFrame(v,cn),300);
+};
 
 function scanFrame(v,cn){
   if(!v||v.readyState!==v.HAVE_ENOUGH_DATA)return;
@@ -807,39 +939,78 @@ function scanFrame(v,cn){
   ctx.drawImage(v,0,0);const img=ctx.getImageData(0,0,cn.width,cn.height);
   if(typeof jsQR==='undefined')return;
   const code=jsQR(img.data,img.width,img.height);
-  if(code){clearInterval(scanInterval);processQR(code.data,'scanResult');$('scanStatus').textContent='✅ ¡QR leído correctamente!';}
+  if(code){clearInterval(scanInterval);processQR(code.data,'scanResult');const st=$('scanStatus');if(st)st.textContent='✅ ¡QR leído correctamente!';}
 }
 
-function stopCamera(){if(scanInterval)clearInterval(scanInterval);if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null}}
+function stopCamera(){if(scanInterval){clearInterval(scanInterval);scanInterval=null}if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null}}
+
+function redeemPrize(info,tid){
+  const t=$(tid);
+  const cfg=loadPrizeConfig();const fk=S.teacherFamily;const fc=cfg[fk];
+  const pt=parseInt(info.prizeType,10);
+  const idx=pt-1;
+  const scanned=loadScanned();
+  const alreadyScanned=!!scanned[info.code];
+
+  let stockNote='',decremented=false;
+  if(!alreadyScanned){
+    if(fc.counts[idx]>0){
+      fc.counts[idx]=fc.counts[idx]-1;
+      savePrizeConfig(cfg);
+      scanned[info.code]={family:fk,prizeType:pt,name:info.name,date:new Date().toISOString()};
+      saveScanned(scanned);
+      decremented=true;
+      stockNote=`<p style="font-size:12px;color:var(--green);margin-top:6px">✓ Descontado del stock. Quedan <strong>${fc.counts[idx]}</strong> premios de tipo ${pt}.</p>`;
+    }else{
+      stockNote=`<p style="font-size:12px;color:var(--red);margin-top:6px">⚠️ Sin stock disponible de tipo ${pt}. Asigna otro premio manualmente.</p>`;
+    }
+  }else{
+    const prev=scanned[info.code];
+    stockNote=`<p style="font-size:12px;color:var(--amber);margin-top:6px">⚠️ Este código ya fue canjeado anteriormente (${(prev&&prev.date||'').slice(0,10)}). No se descuenta de nuevo.</p>`;
+  }
+
+  const prizeName=fc.names[idx]||('Premio tipo '+pt);
+  const familyMatch=info.familyKey===fk;
+
+  t.innerHTML=`<div class="card" style="border:2px solid var(--green);margin-bottom:0">
+    <h3 style="font-family:'Fraunces',serif;font-size:18px;color:var(--green);margin-bottom:10px">🎓 Datos del alumno/a</h3>
+    <p style="font-size:13px"><strong>Nombre:</strong> ${info.name||'—'}</p>
+    <p style="font-size:13px"><strong>Código:</strong> ${info.code||'—'}</p>
+    <p style="font-size:13px"><strong>Familia recomendada:</strong> ${info.family||'—'} ${familyMatch?'✓':'<span style="color:var(--amber);font-size:11px">(distinta de tu panel)</span>'}</p>
+    <p style="font-size:13px"><strong>Puntuación:</strong> ${info.score||'—'}%</p>
+    <p style="font-size:13px"><strong>Fecha:</strong> ${info.date||'—'}</p>
+    <div style="margin-top:14px;padding:18px;background:var(--green-light);border-radius:10px;text-align:center">
+      <div class="prize-label">🎁 Premio asignado</div>
+      <div style="font-family:'Fraunces',serif;font-size:14px;color:var(--green);font-weight:700;margin-top:4px">TIPO ${pt}</div>
+      <div class="prize-name" style="margin-top:6px">${prizeName}</div>
+      ${stockNote}
+    </div>
+  </div>`;
+  refreshCounters();
+}
 
 function processQR(data,tid){
   const t=$(tid);
-  try{const info=JSON.parse(data);const prize=getPrize(info.code);
-    t.innerHTML=`<div class="card" style="border:2px solid var(--green);text-align:left">
-      <h3 style="font-family:'Fraunces',serif;font-size:20px;color:var(--green);margin-bottom:12px">ð Datos del alumno/a</h3>
-      <p><strong>Nombre:</strong> ${info.name||'â'}</p>
-      <p><strong>Código:</strong> ${info.code||'â'}</p>
-      <p><strong>Familia recomendada:</strong> ${info.family||'â'}</p>
-      <p><strong>Puntuación:</strong> ${info.score||'â'}%</p>
-      <p><strong>Fecha:</strong> ${info.date||'â'}</p>
-      <div style="margin-top:16px;padding:16px;background:var(--green-light);border-radius:10px;text-align:center">
-        <div class="prize-label">Premio asignado</div>
-        <div class="prize-name">${prize.emoji} ${prize.name}</div>
-        <div class="prize-desc">${prize.desc}</div>
-      </div></div>`;
-  }catch(e){t.innerHTML=`<div class="card" style="border:2px solid var(--red);text-align:center"><p style="color:var(--red);font-weight:600">â ï¸ Código no reconocido.</p></div>`}
+  try{
+    const info=JSON.parse(data);
+    if(!info.prizeType){
+      t.innerHTML=`<div class="card" style="border:2px solid var(--amber)"><p style="color:var(--amber);font-weight:600">⚠️ Código QR antiguo sin tipo de premio asignado.</p></div>`;
+      return;
+    }
+    redeemPrize(info,tid);
+  }catch(e){
+    t.innerHTML=`<div class="card" style="border:2px solid var(--red);text-align:center"><p style="color:var(--red);font-weight:600">⚠️ Código no reconocido.</p></div>`;
+  }
 }
 
-function manualLookup(){
+window.manualLookup=function(){
   const code=($('manualCode')||{}).value;
   if(!code||!code.trim()){$('manualResult').innerHTML='<p style="color:var(--red)">Introduce un código.</p>';return}
-  const prize=getPrize(code.trim().toUpperCase());
-  $('manualResult').innerHTML=`<div class="card" style="border:2px solid var(--green);text-align:center">
-    <p style="font-size:12px;color:var(--green);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Código: ${code.trim().toUpperCase()}</p>
-    <div class="prize-label">Premio asignado</div>
-    <div class="prize-name">${prize.emoji} ${prize.name}</div>
-    <div class="prize-desc">${prize.desc}</div></div>`;
-}
+  $('manualResult').innerHTML=`<div class="card" style="border:2px solid var(--amber);text-align:center">
+    <p style="color:var(--amber);font-weight:600;font-size:13px">⚠️ El código manual no contiene el tipo de premio asignado.</p>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px">Asigna manualmente un tipo usando los botones de stock arriba. Código registrado: <strong>${code.trim().toUpperCase()}</strong></p>
+  </div>`;
+};
 
 render();
 </script>
