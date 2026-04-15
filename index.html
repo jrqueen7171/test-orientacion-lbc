@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test de Orientación Profesional â IES Luis Bueno Crespo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Fraunces:opsz,wght@9..144,700;9..144,800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#faf8f5;--surface:#fff;--text:#1b1b1f;--muted:#6b6b7b;
+  --green:#2a7d4f;--green-light:#e6f4ec;--green-dark:#1a5c37;
+  --red:#c0392b;--red-light:#fce8e6;--red-bg:#fdf4f3;
+  --amber:#d4890a;--amber-light:#fef3e0;
+  --admin:#1a3a5c;--comercio:#7a4210;--obra:#3d6b35;--electro:#2c3e50;--textil:#6b2d6b;
+  --border:#e8e4df;--shadow:0 2px 16px rgba(0,0,0,.05);--r:14px;
+}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+.app{max-width:800px;margin:0 auto;padding:16px;min-height:100vh}
+.hdr{text-align:center;padding:36px 16px 24px}
+.hdr-badge{display:inline-block;background:var(--green);color:#fff;font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;padding:5px 14px;border-radius:20px;margin-bottom:14px}
+.hdr h1{font-family:'Fraunces',serif;font-size:clamp(26px,5vw,40px);font-weight:800;line-height:1.15;margin-bottom:6px}
+.hdr p{color:var(--muted);font-size:14px;max-width:480px;margin:0 auto}
+.card{background:var(--surface);border-radius:var(--r);padding:28px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:16px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 18px}
+.chip{font-size:11px;font-weight:600;padding:5px 12px;border-radius:16px}
+.c-admin{background:#e3eaf2;color:var(--admin)}.c-comercio{background:#f5ece3;color:var(--comercio)}
+.c-obra{background:#e6f0e4;color:var(--obra)}.c-electro{background:#e0e7ed;color:var(--electro)}
+.c-textil{background:#f0e4f0;color:var(--textil)}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--green);color:#fff;border:none;padding:13px 28px;border-radius:9px;font-family:'Outfit';font-size:14px;font-weight:700;cursor:pointer;transition:.2s}
+.btn:hover{background:var(--green-dark);transform:translateY(-1px)}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn-outline{background:var(--surface);color:var(--text);border:2px solid var(--border)}
+.btn-outline:hover{border-color:var(--green)}
+.btn-dark{background:var(--text);color:#fff}.btn-dark:hover{opacity:.85}
+.prog-wrap{position:sticky;top:0;z-index:100;background:var(--bg);padding:10px 0 6px}
+.prog-top{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:6px}
+.prog-top strong{color:var(--text);font-size:14px}
+.prog-track{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;background:var(--green);border-radius:3px;transition:width .4s}
+.sec-label{display:inline-block;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--green);margin-bottom:10px}
+.q-card{animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.q-num{font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px}
+.q-text{font-size:16px;font-weight:500;margin-bottom:18px;line-height:1.5}
+.opts{display:flex;flex-direction:column;gap:9px}
+.opt{display:flex;align-items:center;gap:11px;width:100%;padding:13px 14px;background:var(--bg);border:2px solid transparent;border-radius:10px;cursor:pointer;font-family:'Outfit';font-size:13.5px;text-align:left;color:var(--text);transition:.15s}
+.opt:hover{border-color:var(--green);background:var(--green-light)}
+.opt.sel{border-color:var(--green);background:var(--green-light);font-weight:600}
+.opt-circle{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s}
+.opt.sel .opt-circle{border-color:var(--green);background:var(--green)}
+.opt.sel .opt-circle::after{content:'';width:7px;height:7px;border-radius:50%;background:#fff}
+.nav{display:flex;justify-content:space-between;gap:10px;margin-top:8px}
+.res-hero{text-align:center;padding:32px 24px}
+.res-hero .emo{font-size:44px;margin-bottom:10px}
+.res-hero h2{font-family:'Fraunces',serif;font-size:24px;margin-bottom:4px}
+.res-hero .sub{color:var(--muted);font-size:13px}
+.score-card{margin-bottom:10px;padding:16px;border-left:4px solid var(--border)}
+.score-card.win{border-left-color:var(--green);background:var(--green-light)}
+.sc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sc-top h3{font-size:14px;font-weight:600}
+.sc-pct{font-size:18px;font-weight:800;font-family:'Fraunces',serif}
+.sc-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.sc-fill{height:100%;border-radius:3px;transition:width 1s}
+.fb-item{padding:18px;margin-bottom:10px;border-radius:var(--r);border:1px solid var(--border)}
+.fb-item.correct{background:var(--green-light);border-color:#b7e1c8}
+.fb-item.incorrect{background:var(--red-bg);border-color:#f0c1bb}
+.fb-item.partial{background:var(--amber-light);border-color:#f0d9a8}
+.fb-q{font-weight:600;font-size:14px;margin-bottom:6px;padding-right:70px}
+.fb-ans{font-size:13px;margin-bottom:4px;padding:6px 10px;border-radius:6px}
+.fb-ans.yours{background:rgba(0,0,0,.04)}
+.fb-ans.ideal{background:var(--green-light)}
+.fb-ans .label{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.fb-explain{font-size:13px;color:var(--text);line-height:1.55;margin-top:8px;padding:10px 12px;background:rgba(0,0,0,.02);border-radius:8px;border-left:3px solid var(--green)}
+.fb-item.incorrect .fb-explain{border-left-color:var(--red)}
+.fb-item.partial .fb-explain{border-left-color:var(--amber)}
+.fb-icon{font-size:14px;float:right;margin-left:8px;background:var(--green);color:#fff;padding:2px 8px;border-radius:8px;font-weight:700;font-size:10px}
+.fb-item.incorrect .fb-icon{background:var(--red)}
+.fb-item.partial .fb-icon{background:var(--amber)}
+.ss-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin:10px 0 3px}
+.ss-row strong{font-weight:600}.ss-row span{color:var(--muted);font-size:12px}
+.ss-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:2px}
+.ss-fill{height:100%;background:var(--green);border-radius:3px;transition:width 1s}
+.ss-verdict{font-size:11px;font-weight:600;margin-bottom:6px}
+.ss-verdict.good{color:var(--green)}.ss-verdict.ok{color:var(--amber)}.ss-verdict.low{color:var(--red)}
+.qr-section{text-align:center;padding:28px}
+.qr-code{display:inline-block;padding:16px;background:#fff;border-radius:12px;border:2px solid var(--green);margin:16px 0}
+.qr-number{font-family:'Fraunces',serif;font-size:32px;font-weight:800;color:var(--green);margin:10px 0}
+.qr-note{font-size:12px;color:var(--muted)}
+.links a{display:inline-block;color:var(--green);font-weight:600;font-size:12px;margin:0 12px 6px 0;text-decoration:none;border-bottom:1px solid currentColor}
+.links a:hover{opacity:.7}
+.info-section h3{font-family:'Fraunces',serif;font-size:18px;margin-bottom:10px}
+.info-section h4{font-size:13px;font-weight:700;color:var(--green);margin:14px 0 4px}
+.info-section p,.info-section li{font-size:13px;color:var(--muted);line-height:1.6}
+.info-section ul{padding-left:18px;margin-bottom:6px}
+.info-section li{margin-bottom:3px}
+.footer{text-align:center;padding:20px 0;font-size:11px;color:var(--muted)}
+.filter-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.ftab{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;transition:.15s}
+.ftab:hover{border-color:var(--green)}.ftab.active{background:var(--green);color:#fff;border-color:var(--green)}
+.improve-box{padding:14px;border-radius:10px;margin-bottom:10px}
+.improve-box.red{background:var(--red-bg);border-left:4px solid var(--red)}
+.improve-box.amber{background:var(--amber-light);border-left:4px solid var(--amber)}
+.improve-box strong{font-size:14px}
+.improve-box p{font-size:13px;margin-top:4px;color:var(--muted)}
+.prize-box{margin-top:14px;padding:16px 20px;background:var(--green-light);border-radius:10px;display:inline-block}
+.prize-label{font-size:10px;font-weight:700;color:var(--green);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px}
+.prize-name{font-size:18px;font-weight:800;color:var(--green)}
+.prize-desc{font-size:12px;color:var(--muted);margin-top:2px}
+.sent-ok{display:inline-block;background:var(--green-light);color:var(--green);font-size:11px;font-weight:700;padding:4px 12px;border-radius:12px;margin-top:8px}
+@media(max-width:600px){.app{padding:10px}.card,.fb-item{padding:18px}}
+@media print{
+  .no-print{display:none!important}
+  .card{box-shadow:none;break-inside:avoid;border:1px solid #ddd}
+  .fb-item{break-inside:avoid}
+  body{background:#fff}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// â  CONFIGURACIÃN â CAMBIA SOLO ESTA LÃNEA             â
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Pega aquí la URL de tu Google Apps Script (Paso 2 de la guía)
+// Si aún no la tienes, déjala vacía y los datos no se enviarán
+const SHEETS_URL = '';
+// Ejemplo: const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbx.../exec';
+
+// âââââââââââââââââââââââââââââââââââââââââââ
+// FAMILIAS PROFESIONALES IES LUIS BUENO CRESPO
+// âââââââââââââââââââââââââââââââââââââââââââ
+const FAM={
+  admin:{nombre:"Administración y Gestión",emoji:"ð",color:"admin",
+    ciclos:[{n:"GM",t:"Gestión Administrativa",d:"Bilingüe inglés · Mañana/Tarde"},{n:"GS",t:"Administración y Finanzas",d:"Bilingüe inglés · Mañana/Tarde"}],
+    desc:"Gestión documental, contabilidad, fiscalidad y RRHH. Dominarás ofimática avanzada, tesorería y tramitación. Los ciclos son bilingües en inglés, ampliando tus salidas profesionales.",
+    salidas:"Auxiliar administrativo/a, contable, gestor/a de cobros, administrativo/a de banca, técnico/a fiscal, responsable de administración en PYMES.",
+    url:"https://sites.google.com/g.educaand.es/admonyfinanzas/inicio"},
+  comercio:{nombre:"Comercio y Marketing",emoji:"ð",color:"comercio",
+    ciclos:[{n:"FPB",t:"Servicios Comerciales",d:"Mañana"},{n:"GM",t:"Actividades Comerciales",d:"Mañana"},{n:"GS",t:"Transporte y Logística",d:"Tarde"},{n:"GS",t:"Gestión de Ventas y Espacios Comerciales",d:"Bilingüe inglés"}],
+    desc:"Estrategias de venta, escaparatismo, logística y comportamiento del consumidor. Trayectoria completa desde FPB hasta Grado Superior en comercio y distribución.",
+    salidas:"Vendedor/a técnico/a, visual merchandiser, coordinador/a logística, jefe/a de ventas, responsable e-commerce, técnico/a comercio exterior.",
+    url:"https://sites.google.com/iesluisbuenocrespo.es/comercio/inicio"},
+  obra:{nombre:"Edificación y Obra Civil",emoji:"ðï¸",color:"obra",
+    ciclos:[{n:"GS",t:"Proyectos de Obra Civil",d:"Bilingüe inglés"}],
+    desc:"Elaboración de proyectos de obras civiles con AutoCAD y Civil 3D. Topografía, replanteo, cálculo de estructuras y documentación técnica. Bilingüe con oportunidades Erasmus+.",
+    salidas:"Delineante proyectista, topógrafo/a, técnico/a urbanismo, modelador/a BIM, técnico/a oficina técnica de ingeniería.",
+    url:"https://sites.google.com/g.educaand.es/edificacion-y-obra-civil/inicio"},
+  electro:{nombre:"Electricidad y Electrónica",emoji:"â¡",color:"electro",
+    ciclos:[{n:"FPB",t:"Electricidad y Electrónica",d:"Mañana"},{n:"GM",t:"Instalaciones de Telecomunicaciones",d:"Mañana"},{n:"GS",t:"Sistemas de Telecomunicaciones e Informáticos",d:"Bilingüe inglés"},{n:"CE",t:"Drones (Aeronaves pilotadas remotamente)",d:"Tarde"}],
+    desc:"Desde instalación eléctrica hasta telecomunicaciones avanzadas y pilotaje de drones. Fibra óptica, redes, domótica. Centro MikroTik Academy.",
+    salidas:"Instalador/a electricista, técnico/a telecomunicaciones, instalador/a fibra óptica, administrador/a sistemas, piloto/a de drones.",
+    url:"https://sites.google.com/g.educaand.es/electricidadyelectronica/inicio"},
+  textil:{nombre:"Textil, Confección y Piel",emoji:"ð§µ",color:"textil",
+    ciclos:[{n:"GM",t:"Confección y Moda",d:"Mañana/Tarde"},{n:"GS",t:"Patronaje y Moda",d:"Bilingüe inglés · Mañana"},{n:"GS",t:"Vestuario a Medida y de Espectáculos",d:"Tarde"}],
+    desc:"Corte, confección, patronaje digital e industrial, diseño de moda y vestuario para espectáculos. Patronaje y Moda bilingüe con Erasmus+.",
+    salidas:"Patronista, diseñador/a de moda, sastre/a, figurinista, estilista, gestor/a taller de confección.",
+    url:"https://sites.google.com/g.educaand.es/textil/inicio"}
+};
+
+const SSKILLS={
+  puntualidad:"Puntualidad y compromiso",
+  asertividad:"Asertividad",
+  don_gentes:"Don de gentes y simpatía",
+  resolucion_conflictos:"Resolución de conflictos",
+  negociacion:"Capacidad de negociación",
+  organizacion:"Organización y planificación",
+  creatividad:"Creatividad",
+  trabajo_equipo:"Trabajo en equipo",
+  adaptabilidad:"Adaptabilidad",
+  pensamiento_critico:"Pensamiento crítico"
+};
+
+// âââââââââââââââââââââââââââââââââââââââââââ
+// 50 PREGUNTAS
+// âââââââââââââââââââââââââââââââââââââââââââ
+const QS=[
+{id:1,section:"soft",skill:"puntualidad",text:"Tienes una reunión importante a las 9:00. ¿Qué haces?",
+options:[{text:"Llego 10 minutos antes para preparar todo",scores:{admin:3,comercio:2,obra:2,electro:2,textil:1},correct:true},{text:"Llego justo a la hora, ni un minuto más",scores:{admin:1,comercio:1,obra:1,electro:1,textil:1},correct:false},{text:"Si me retraso 5 minutos no pasa nada",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Depende de lo importante que sea la reunión",scores:{admin:0,comercio:1,obra:0,electro:0,textil:1},correct:false}],
+idealExplanation:"La puntualidad demuestra respeto por el tiempo de los demás y profesionalidad. Llegar antes te permite prepararte y transmitir seriedad.",
+wrongExplanation:"Llegar tarde genera imagen de falta de compromiso. Consejo: planifica tu ruta con margen, prepara lo necesario la noche anterior y usa alarmas."},
+
+{id:2,section:"soft",skill:"puntualidad",text:"Un compañero te pide que le cubras porque va a llegar tarde. ¿Qué haces?",
+options:[{text:"Le ayudo esta vez pero le digo que no debería ser habitual",scores:{admin:2,comercio:2,obra:2,electro:2,textil:2},correct:true},{text:"Le cubro sin decirle nada, somos amigos",scores:{admin:0,comercio:1,obra:0,electro:0,textil:1},correct:false},{text:"Me niego, cada uno debe asumir sus responsabilidades",scores:{admin:1,comercio:0,obra:1,electro:1,textil:0},correct:false},{text:"Le aviso al profesor/jefe directamente",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"El equilibrio entre compañerismo y responsabilidad es clave. Ayudar puntualmente pero comunicar que no debe repetirse demuestra empatía y asertividad.",
+wrongExplanation:"Cubrir siempre fomenta malos hábitos. Delatar rompe la confianza. Consejo: practica la comunicación asertiva expresando tu opinión con respeto pero firmeza."},
+
+{id:3,section:"soft",skill:"puntualidad",text:"Tienes un trabajo que entregar mañana y aún te queda bastante. ¿Qué haces?",
+options:[{text:"Organizo lo que falta, priorizo y trabajo hasta terminarlo con calidad",scores:{admin:3,comercio:1,obra:2,electro:2,textil:1},correct:true},{text:"Hago lo mínimo para entregar algo a tiempo",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Pido una prórroga al profesor/jefe",scores:{admin:1,comercio:1,obra:1,electro:1,textil:1},correct:false},{text:"Copio partes de internet para acabar antes",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"La gestión del tiempo y el compromiso con la calidad son esenciales. Planificar lo pendiente y trabajar con método demuestra madurez profesional.",
+wrongExplanation:"Entregar algo mediocre o copiar perjudica tu aprendizaje. Consejo: usa técnicas como Pomodoro (25 min trabajo + 5 descanso), divide tareas grandes en partes pequeñas."},
+
+{id:4,section:"soft",skill:"puntualidad",text:"¿Cómo planificas tu semana de estudio o trabajo?",
+options:[{text:"Uso agenda o calendario con horarios fijos y objetivos diarios",scores:{admin:3,comercio:1,obra:2,electro:1,textil:0},correct:true},{text:"Tengo una idea general pero no anoto nada",scores:{admin:0,comercio:1,obra:0,electro:1,textil:1},correct:false},{text:"Estudio cuando me apetece o cuando hay examen",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Hago lo que vaya surgiendo cada día",scores:{admin:0,comercio:1,obra:0,electro:0,textil:1},correct:false}],
+idealExplanation:"La planificación estructurada multiplica tu productividad. Usar herramientas concretas te da control sobre tu tiempo.",
+wrongExplanation:"Sin planificación pierdes tiempo y acumulas estrés. Consejo: cada domingo planifica la semana en 15 min. Herramientas gratuitas: Google Calendar, Notion, Trello."},
+
+{id:5,section:"soft",skill:"puntualidad",text:"Te comprometes a terminar tu parte de un proyecto grupal para el viernes. El jueves ves que no llegas. ¿Qué haces?",
+options:[{text:"Aviso al grupo inmediatamente, explico la situación y propongo solución",scores:{admin:2,comercio:3,obra:2,electro:2,textil:1},correct:true},{text:"Intento hacerlo todo corriendo la noche del jueves",scores:{admin:0,comercio:0,obra:0,electro:1,textil:1},correct:false},{text:"No digo nada y espero que no se note mucho",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Pido a otro compañero que haga mi parte",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"La comunicación anticipada de problemas permite al equipo reorganizarse. Proponer soluciones demuestra responsabilidad y liderazgo.",
+wrongExplanation:"Ocultar un retraso perjudica a todo el equipo. Consejo: en cuanto detectes un problema, comunícalo. La transparencia genera confianza."},
+
+{id:6,section:"soft",skill:"asertividad",text:"Un profesor o jefe te critica injustamente delante de otros. ¿Cómo reaccionas?",
+options:[{text:"Espero a estar a solas y le explico mi punto de vista con calma y respeto",scores:{admin:2,comercio:3,obra:2,electro:1,textil:1},correct:true},{text:"Me callo para no crear problemas",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Le respondo en el momento, también delante de todos",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Le doy la razón aunque no la tenga",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"La asertividad consiste en defender tus derechos sin agredir ni someterse. Elegir el momento y el tono adecuados es inteligencia emocional.",
+wrongExplanation:"Callarte genera frustración acumulada. Responder agresivamente daña las relaciones. Consejo: usa el mensaje-yo ('Yo siento que...' en lugar de 'Tú siempre...')."},
+
+{id:7,section:"soft",skill:"asertividad",text:"Un compañero se atribuye el mérito de una idea tuya. ¿Qué haces?",
+options:[{text:"Hablo con él/ella directamente: 'Esa idea la propuse yo, ¿lo recuerdas?'",scores:{admin:2,comercio:2,obra:2,electro:2,textil:2},correct:true},{text:"Lo dejo pasar, no merece la pena discutir",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Se lo cuento a otros para que sepan la verdad",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Lo denuncio formalmente al profesor o superior",scores:{admin:1,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Reclamar lo tuyo de forma directa y respetuosa es asertividad pura. No es pelear sino poner límites claros.",
+wrongExplanation:"Callarte refuerza que te quiten méritos. Hablar a espaldas genera desconfianza. Consejo: documenta tus ideas (emails, notas)."},
+
+{id:8,section:"soft",skill:"asertividad",text:"Te piden hacer algo que crees que no es correcto éticamente. ¿Cómo actúas?",
+options:[{text:"Expreso mi desacuerdo con argumentos y propongo una alternativa ética",scores:{admin:3,comercio:2,obra:3,electro:2,textil:1},correct:true},{text:"Lo hago porque me lo mandan, no quiero problemas",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Me niego rotundamente sin dar explicaciones",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Consulto con otros compañeros qué harían ellos",scores:{admin:1,comercio:1,obra:1,electro:1,textil:1},correct:false}],
+idealExplanation:"La integridad profesional requiere valentía para decir no cuando algo no es ético, pero también inteligencia para argumentar y ofrecer alternativas.",
+wrongExplanation:"Obedecer sin cuestionar puede llevarte a situaciones legales graves. Consejo: conoce tus derechos laborales y propón siempre soluciones."},
+
+{id:9,section:"soft",skill:"asertividad",text:"En una discusión grupal, todos opinan diferente a ti pero tú tienes datos que apoyan tu postura. ¿Qué haces?",
+options:[{text:"Presento mis datos con respeto: 'Entiendo vuestro punto, pero los datos muestran que...'",scores:{admin:3,comercio:2,obra:3,electro:3,textil:1},correct:true},{text:"Cambio de opinión para no ser el/la diferente",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Insisto en mi postura hasta que me den la razón",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Me callo y pienso que ya se darán cuenta",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Defender una postura basada en datos, reconociendo las otras opiniones, es asertividad madura y argumentación fundamentada.",
+wrongExplanation:"Ceder por presión social es conformismo. Insistir sin escuchar es agresividad. Consejo: usa frases puente como 'Entiendo lo que dices y además...'"},
+
+{id:10,section:"soft",skill:"asertividad",text:"¿Cómo pides ayuda cuando la necesitas?",
+options:[{text:"Identifico exactamente qué necesito y pido de forma clara y directa",scores:{admin:2,comercio:2,obra:2,electro:2,textil:2},correct:true},{text:"Espero a que alguien se dé cuenta de que necesito ayuda",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Doy muchas vueltas antes de pedir, me da vergüenza",scores:{admin:0,comercio:0,obra:0,electro:0,textil:1},correct:false},{text:"Solo pido ayuda cuando ya es demasiado tarde",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Saber pedir ayuda de forma clara y oportuna es una competencia profesional, no una debilidad.",
+wrongExplanation:"No pedir ayuda por orgullo o vergüenza lleva a errores. Consejo: sé específico/a: no digas 'necesito ayuda', di 'necesito que me expliques cómo funciona X'."},
+
+{id:11,section:"soft",skill:"don_gentes",text:"Llegas a un sitio nuevo donde no conoces a nadie. ¿Qué haces?",
+options:[{text:"Me presento con naturalidad y busco puntos en común para conversar",scores:{admin:1,comercio:3,obra:1,electro:1,textil:2},correct:true},{text:"Espero a que alguien me hable primero",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Me quedo en mi sitio mirando el móvil",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Me acerco solo si veo a alguien que parece interesante",scores:{admin:0,comercio:1,obra:0,electro:0,textil:1},correct:false}],
+idealExplanation:"La iniciativa social y la capacidad de conectar con desconocidos es fundamental en comercio, ventas y trabajo en equipo.",
+wrongExplanation:"Esperar pasivamente limita oportunidades. Consejo: prepara una presentación sencilla y practica en situaciones de baja presión."},
+
+{id:12,section:"soft",skill:"don_gentes",text:"Un cliente o compañero está visiblemente enfadado. ¿Cómo actúas?",
+options:[{text:"Escucho activamente, empatizo y busco entender su problema antes de responder",scores:{admin:2,comercio:3,obra:1,electro:1,textil:2},correct:true},{text:"Le pido que se calme antes de hablar",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Intento resolver su problema rápido para que se vaya",scores:{admin:1,comercio:1,obra:1,electro:1,textil:0},correct:false},{text:"Llamo a un superior para que lo gestione",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"La escucha activa y la empatía desarman el enfado. Antes de solucionar, hay que hacer sentir al otro escuchado.",
+wrongExplanation:"Decir 'cálmate' suele empeorar la situación. Consejo: usa frases como 'Entiendo tu frustración', mantén contacto visual y no interrumpas."},
+
+{id:13,section:"soft",skill:"don_gentes",text:"¿Cómo te describirían tus amigos o compañeros?",
+options:[{text:"Cercano/a, buen/a comunicador/a y siempre dispuesto/a a ayudar",scores:{admin:1,comercio:3,obra:1,electro:1,textil:2},correct:true},{text:"Reservado/a pero fiable cuando me necesitan",scores:{admin:2,comercio:0,obra:2,electro:2,textil:0},correct:false},{text:"Divertido/a pero a veces poco serio/a",scores:{admin:0,comercio:1,obra:0,electro:0,textil:1},correct:false},{text:"Independiente, voy a lo mío",scores:{admin:0,comercio:0,obra:1,electro:1,textil:0},correct:false}],
+idealExplanation:"Cercanía, comunicación y disponibilidad definen un profesional con excelente don de gentes, esencial en ventas y gestión de equipos.",
+wrongExplanation:"Ser reservado es válido pero limita oportunidades de networking. Consejo: practica el interés genuino por los demás."},
+
+{id:14,section:"soft",skill:"don_gentes",text:"En una feria o evento del centro, ¿cuál sería tu papel ideal?",
+options:[{text:"Recibir visitantes, explicar proyectos y conectar con la gente",scores:{admin:1,comercio:3,obra:0,electro:0,textil:2},correct:true},{text:"Preparar la documentación y materiales del stand",scores:{admin:3,comercio:0,obra:1,electro:1,textil:0},correct:false},{text:"Montar la instalación técnica del espacio",scores:{admin:0,comercio:0,obra:2,electro:3,textil:0},correct:false},{text:"Diseñar la decoración y la imagen visual",scores:{admin:0,comercio:1,obra:0,electro:0,textil:3},correct:false}],
+idealExplanation:"El trato directo con el público demuestra simpatía natural y capacidad de comunicación, habilidades que abren puertas laborales.",
+wrongExplanation:"Todas las opciones son valiosas, pero el don de gentes se demuestra en la interacción directa. Consejo: empieza poco a poco y ve ganando confianza."},
+
+{id:15,section:"soft",skill:"don_gentes",text:"¿Cómo reaccionas ante alguien con opiniones muy diferentes a las tuyas?",
+options:[{text:"Muestro curiosidad genuina: '¿Por qué piensas eso? Me interesa entenderlo'",scores:{admin:2,comercio:3,obra:1,electro:1,textil:2},correct:true},{text:"Respeto su opinión pero no la comento",scores:{admin:1,comercio:0,obra:1,electro:1,textil:0},correct:false},{text:"Intento convencerle de que mi postura es la correcta",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Evito el tema para no crear conflicto",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"La curiosidad genuina ante la diversidad de opiniones es la base de relaciones profesionales saludables.",
+wrongExplanation:"Evitar temas no fomenta el diálogo. Consejo: practica la escucha activa, haz preguntas abiertas. El respeto no implica acuerdo."},
+
+{id:16,section:"soft",skill:"resolucion_conflictos",text:"Dos compañeros de tu equipo discuten y el proyecto se paraliza. ¿Qué haces?",
+options:[{text:"Hablo con cada uno por separado, entiendo sus posturas y propongo un acuerdo",scores:{admin:2,comercio:3,obra:2,electro:1,textil:1},correct:true},{text:"Espero a que se les pase y sigan trabajando",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Tomo partido por quien creo que tiene razón",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Se lo cuento al profesor/jefe para que lo resuelva",scores:{admin:1,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"La mediación es una habilidad de liderazgo muy valiosa. Escuchar ambas partes en privado y buscar el interés común demuestra madurez emocional.",
+wrongExplanation:"Esperar no resuelve nada; tomar partido polariza más. Consejo: usa la técnica 'escuchar-validar-proponer'."},
+
+{id:17,section:"soft",skill:"resolucion_conflictos",text:"Un cliente se queja de un servicio que tú no has prestado pero que es de tu departamento. ¿Qué haces?",
+options:[{text:"Asumo la responsabilidad del departamento, me disculpo y busco la solución",scores:{admin:2,comercio:3,obra:1,electro:1,textil:1},correct:true},{text:"Le explico que no fui yo y le derivo a mi compañero",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Le atiendo lo justo y le pido que llame en otro momento",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Me disculpo profusamente y prometo que no volverá a pasar",scores:{admin:1,comercio:1,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"El sentido de equipo y la orientación al cliente implican asumir responsabilidad colectiva. El cliente no debe conocer problemas internos.",
+wrongExplanation:"Derivar al cliente o echar culpa genera mala imagen. Consejo: usa 'Me hago cargo + Acción concreta + Seguimiento'."},
+
+{id:18,section:"soft",skill:"resolucion_conflictos",text:"En tu equipo hay una persona que siempre impone sus ideas y no escucha. ¿Cómo lo gestionas?",
+options:[{text:"En privado le explico cómo su actitud afecta al equipo, con ejemplos concretos",scores:{admin:2,comercio:2,obra:2,electro:2,textil:2},correct:true},{text:"Le ignoro y hago mi parte del trabajo",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Le planto cara delante de todos",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Me quejo al profesor/jefe",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Abordar problemas de comportamiento en privado, con datos concretos, es resolución de conflictos en estado puro.",
+wrongExplanation:"Ignorar el problema lo empeora. Confrontar en público humilla. Consejo: usa 'Situación + Impacto + Petición'."},
+
+{id:19,section:"soft",skill:"resolucion_conflictos",text:"Has cometido un error que afecta al trabajo de otros. ¿Cómo lo manejas?",
+options:[{text:"Lo reconozco inmediatamente, pido disculpas y propongo cómo repararlo",scores:{admin:3,comercio:2,obra:3,electro:2,textil:1},correct:true},{text:"Intento arreglarlo sin que nadie se entere",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Busco si alguien más contribuyó al error para compartir culpa",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Espero a que me lo digan antes de admitirlo",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Reconocer errores con rapidez y proponer soluciones genera confianza y respeto en cualquier sector profesional.",
+wrongExplanation:"Ocultar errores puede tener consecuencias graves. Consejo: practica 'Error + Disculpa + Plan de acción'. Los errores son oportunidades de aprendizaje."},
+
+{id:20,section:"soft",skill:"resolucion_conflictos",text:"Dos personas de tu entorno tienen un conflicto que te afecta indirectamente. ¿Qué haces?",
+options:[{text:"Les propongo hablar los tres juntos, facilito el diálogo pero no tomo partido",scores:{admin:1,comercio:3,obra:1,electro:1,textil:2},correct:true},{text:"Me mantengo neutral y no me meto",scores:{admin:1,comercio:0,obra:1,electro:1,textil:0},correct:false},{text:"Apoyo al que creo que tiene razón",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Me aparto del conflicto aunque me perjudique",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Facilitar el diálogo sin tomar partido es mediación profesional. Crear el espacio para que se escuchen es una competencia muy demandada.",
+wrongExplanation:"Mantenerse al margen cuando te afecta es evitación. Consejo: aprende técnicas de mediación. Pregunta '¿Qué necesitas?' en lugar de '¿Quién tiene razón?'"},
+
+{id:21,section:"soft",skill:"negociacion",text:"Estás comprando un producto y crees que el precio es alto. ¿Cómo actúas?",
+options:[{text:"Investigo precios de mercado, presento datos y propongo un precio justo para ambos",scores:{admin:3,comercio:3,obra:1,electro:1,textil:1},correct:true},{text:"Acepto el precio, no me gusta regatear",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Le digo directamente que es caro y pido descuento",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Me voy a buscar otro sitio más barato",scores:{admin:0,comercio:1,obra:0,electro:0,textil:1},correct:false}],
+idealExplanation:"Negociar con datos es profesional. Investigar el mercado y buscar acuerdos beneficiosos para ambas partes es la base del comercio.",
+wrongExplanation:"Aceptar siempre te perjudica. Pedir descuento sin argumentos es poco convincente. Consejo: antes de negociar, investiga siempre y lleva datos comparativos."},
+
+{id:22,section:"soft",skill:"negociacion",text:"Tu jefe te propone un horario que no te conviene. ¿Cómo lo gestionas?",
+options:[{text:"Le explico mi situación, propongo una alternativa concreta y busco un acuerdo",scores:{admin:2,comercio:2,obra:2,electro:2,textil:2},correct:true},{text:"Acepto sin protestar, es el jefe",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Le digo que no puedo y ya está",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Acepto pero luego falto o llego tarde",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Negociar condiciones con propuestas concretas demuestra madurez profesional. No es confrontación: es búsqueda de soluciones.",
+wrongExplanation:"Aceptar sin querer y luego incumplir es la peor opción. Consejo: siempre ofrece una contrapartida. Negocia desde la solución, no desde el problema."},
+
+{id:23,section:"soft",skill:"negociacion",text:"En un proyecto grupal, quieres hacer una parte que otro compañero también quiere. ¿Cómo lo resuelves?",
+options:[{text:"Propongo dividir esa parte o alternar, buscando que ambos aportemos",scores:{admin:1,comercio:2,obra:2,electro:2,textil:2},correct:true},{text:"Le cedo mi preferencia para evitar conflicto",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Argumento por qué yo debería hacerlo",scores:{admin:1,comercio:1,obra:1,electro:1,textil:0},correct:false},{text:"Le pido al profesor que decida",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Buscar soluciones creativas donde ambas partes ganen es la esencia de la negociación colaborativa.",
+wrongExplanation:"Ceder siempre frustra. Imponer genera resentimiento. Consejo: ante un conflicto de intereses, piensa en opciones creativas."},
+
+{id:24,section:"soft",skill:"negociacion",text:"Un proveedor no cumple los plazos acordados. ¿Cómo actúas?",
+options:[{text:"Le contacto, documento el incumplimiento y negocio una compensación o solución",scores:{admin:3,comercio:2,obra:3,electro:2,textil:1},correct:true},{text:"Le doy más tiempo, todos tenemos imprevistos",scores:{admin:0,comercio:0,obra:0,electro:0,textil:1},correct:false},{text:"Cambio de proveedor sin más",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Me enfado y le amenazo con denunciarle",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Documentar, comunicar y negociar compensaciones es gestión profesional de conflictos comerciales.",
+wrongExplanation:"Dar más tiempo sin consecuencias incentiva retrasos. Amenazar rompe relaciones. Consejo: lleva siempre registro escrito de acuerdos."},
+
+{id:25,section:"soft",skill:"negociacion",text:"¿Cuál es la clave de una buena negociación para ti?",
+options:[{text:"Preparación (datos), escucha activa y buscar que ambas partes ganen",scores:{admin:3,comercio:3,obra:2,electro:2,textil:1},correct:true},{text:"Ser más listo que el otro y obtener la mayor ventaja",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Tener paciencia y esperar a que el otro ceda",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"No negociar: si algo no me gusta, busco otra opción",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"La negociación profesional se basa en preparación, escucha y acuerdos mutuamente beneficiosos.",
+wrongExplanation:"Ver la negociación como batalla genera relaciones tóxicas. Consejo: prepara siempre tus datos, tu objetivo mínimo y una alternativa."},
+
+{id:26,section:"soft",skill:"organizacion",text:"¿Cómo organizas tus materiales de estudio o trabajo?",
+options:[{text:"Digital y físicamente ordenado: carpetas etiquetadas, archivos con nombre lógico",scores:{admin:3,comercio:1,obra:2,electro:2,textil:0},correct:true},{text:"Tengo un orden mental pero mi escritorio es un caos",scores:{admin:0,comercio:1,obra:0,electro:1,textil:1},correct:false},{text:"Solo ordeno cuando busco algo y no lo encuentro",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Lo organizo de forma visual: colores, post-its, mood boards",scores:{admin:0,comercio:1,obra:0,electro:0,textil:3},correct:false}],
+idealExplanation:"La organización sistemática ahorra tiempo y reduce errores. Es especialmente valorada en administración e ingeniería.",
+wrongExplanation:"El 'orden mental' falla cuando hay mucho volumen. Consejo: convención de nombres (FECHA_ASIGNATURA_Tema) y 5 min al día para ordenar."},
+
+{id:27,section:"soft",skill:"organizacion",text:"Tienes 5 tareas urgentes y solo puedes hacer 3 hoy. ¿Cómo decides?",
+options:[{text:"Evalúo impacto y urgencia, hago primero las de mayor consecuencia",scores:{admin:3,comercio:2,obra:3,electro:2,textil:0},correct:true},{text:"Hago las que me gustan primero",scores:{admin:0,comercio:0,obra:0,electro:0,textil:1},correct:false},{text:"Intento hacer las 5 aunque sea a medias",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Empiezo por la más rápida para ir tachando",scores:{admin:1,comercio:1,obra:0,electro:1,textil:1},correct:false}],
+idealExplanation:"Priorizar por impacto y urgencia (Matriz de Eisenhower) es la técnica más efectiva de gestión del tiempo.",
+wrongExplanation:"Hacer todo a medias garantiza mala calidad. Consejo: clasifica en 4 cuadrantes: urgente+importante, importante no urgente, urgente no importante, ni una ni otra."},
+
+{id:28,section:"soft",skill:"organizacion",text:"¿Qué opinas de los plazos y fechas límite?",
+options:[{text:"Son necesarios: me ayudan a estructurar mi trabajo y cumplir objetivos",scores:{admin:3,comercio:2,obra:3,electro:3,textil:1},correct:true},{text:"Me agobinan, prefiero trabajar a mi ritmo",scores:{admin:0,comercio:0,obra:0,electro:0,textil:1},correct:false},{text:"Los cumplo solo si alguien los controla",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Son orientativos, no hay que tomárselos tan en serio",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Los plazos son la columna vertebral de cualquier proyecto. Verlos como aliados es madurez profesional.",
+wrongExplanation:"Si te agobinan, el problema está en la planificación. Consejo: divide cada plazo final en mini-plazos intermedios con margen."},
+
+{id:29,section:"soft",skill:"creatividad",text:"Si pudieras crear algo desde cero, ¿qué elegirías?",
+options:[{text:"Un sistema de gestión empresarial eficiente",scores:{admin:3,comercio:0,obra:1,electro:2,textil:0},correct:false},{text:"Una campaña de marketing viral o tienda online",scores:{admin:0,comercio:3,obra:0,electro:0,textil:1},correct:false},{text:"Un puente, edificio sostenible o instalación técnica",scores:{admin:0,comercio:0,obra:3,electro:2,textil:0},correct:false},{text:"Una colección de moda o vestuario para una película",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3},correct:false}],
+idealExplanation:"No hay respuesta correcta: tu elección refleja tus verdaderas pasiones. La motivación intrínseca es el mejor predictor de éxito profesional.",
+wrongExplanation:"No hay respuesta incorrecta. Consejo: reflexiona sobre qué te haría levantarte motivado/a cada lunes. Esa es tu vocación."},
+
+{id:30,section:"soft",skill:"creatividad",text:"¿Cómo generas ideas nuevas?",
+options:[{text:"Analizo datos y busco patrones o ineficiencias",scores:{admin:3,comercio:1,obra:2,electro:2,textil:0},correct:false},{text:"Observo tendencias, competencia y lo que funciona en otros sectores",scores:{admin:1,comercio:3,obra:0,electro:0,textil:2},correct:false},{text:"Experimento con tecnología y materiales",scores:{admin:0,comercio:0,obra:2,electro:3,textil:2},correct:false},{text:"Dibujo, boceto y dejo volar la imaginación",scores:{admin:0,comercio:0,obra:1,electro:0,textil:3},correct:false}],
+idealExplanation:"No hay forma 'correcta' de generar ideas. Cada estilo creativo apunta a una familia profesional. Conocerte es clave.",
+wrongExplanation:"No hay respuesta incorrecta. Consejo: identifica tu estilo creativo natural y poténcialo."},
+
+{id:31,section:"soft",skill:"trabajo_equipo",text:"¿Cuál es tu rol natural en un equipo?",
+options:[{text:"Organizo tareas, plazos y me aseguro de que todo fluya",scores:{admin:3,comercio:1,obra:2,electro:1,textil:0},correct:false},{text:"Motivo, comunico y mantengo al equipo unido",scores:{admin:1,comercio:3,obra:0,electro:0,textil:1},correct:false},{text:"Me encargo de la parte técnica o práctica",scores:{admin:0,comercio:0,obra:2,electro:3,textil:2},correct:false},{text:"Aporto ideas originales y la visión creativa",scores:{admin:0,comercio:1,obra:1,electro:0,textil:3},correct:false}],
+idealExplanation:"Cada rol es igualmente valioso. Los mejores equipos tienen diversidad de roles: organizadores, comunicadores, técnicos y creativos.",
+wrongExplanation:"No hay respuesta incorrecta. Consejo: conoce la teoría de roles de equipo de Belbin y trabaja también tus roles secundarios."},
+
+{id:32,section:"soft",skill:"trabajo_equipo",text:"Un compañero tiene dificultades con su parte del trabajo. ¿Qué haces?",
+options:[{text:"Le ofrezco ayuda específica sin hacerle sentir mal y respetando su autonomía",scores:{admin:2,comercio:2,obra:2,electro:2,textil:2},correct:true},{text:"Hago su parte para que el proyecto no sufra",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Le digo que se esfuerce más",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Se lo comento al responsable",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Ayudar sin anular al otro es la base del verdadero trabajo en equipo. Ofrecer ayuda concreta genera compañerismo real.",
+wrongExplanation:"Hacerle su trabajo no le ayuda a crecer. Consejo: ofrece ayuda específica ('¿Quieres que repasemos juntos X?') en lugar de genérica."},
+
+{id:33,section:"soft",skill:"trabajo_equipo",text:"¿Cómo celebras un éxito del equipo?",
+options:[{text:"Reconozco la aportación de cada persona y celebramos juntos",scores:{admin:2,comercio:3,obra:1,electro:1,textil:2},correct:true},{text:"Me alegro internamente pero no lo expreso mucho",scores:{admin:1,comercio:0,obra:1,electro:1,textil:0},correct:false},{text:"Me centro en el siguiente proyecto",scores:{admin:0,comercio:0,obra:1,electro:1,textil:0},correct:false},{text:"Me atribuyo el mérito si fui quien más trabajó",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"Reconocer aportaciones individuales y celebrar colectivamente fortalece la cohesión y la motivación del equipo.",
+wrongExplanation:"No celebrar desmotiva al equipo. Consejo: di 'Hemos conseguido' en lugar de 'He conseguido'. Nombra aportaciones concretas de cada persona."},
+
+{id:34,section:"soft",skill:"adaptabilidad",text:"Te cambian de grupo/proyecto de repente. ¿Cómo reaccionas?",
+options:[{text:"Me adapto rápido: conozco al nuevo equipo, entiendo el contexto y me pongo al día",scores:{admin:1,comercio:3,obra:1,electro:2,textil:2},correct:true},{text:"Me cuesta pero intento adaptarme poco a poco",scores:{admin:1,comercio:1,obra:1,electro:1,textil:1},correct:false},{text:"Me quejo, estaba a gusto donde estaba",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Acepto pero no me implico tanto como antes",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"La adaptabilidad rápida es una de las competencias más demandadas del siglo XXI.",
+wrongExplanation:"Resistir el cambio te perjudica. Consejo: pregúntate '¿Qué puedo aprender aquí?' en lugar de '¿Qué he perdido?'"},
+
+{id:35,section:"soft",skill:"adaptabilidad",text:"Te piden aprender una herramienta digital nueva que nunca has usado. ¿Qué haces?",
+options:[{text:"La instalo, busco tutoriales y empiezo a practicar de inmediato",scores:{admin:1,comercio:1,obra:2,electro:3,textil:1},correct:true},{text:"Busco un manual completo antes de tocar nada",scores:{admin:2,comercio:0,obra:1,electro:1,textil:0},correct:false},{text:"Le pido a alguien que me enseñe personalmente",scores:{admin:0,comercio:2,obra:0,electro:0,textil:1},correct:false},{text:"Intento evitarla y usar lo que ya sé",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
+idealExplanation:"La proactividad en el aprendizaje digital es imprescindible. Combinar exploración práctica con tutoriales es lo más eficiente.",
+wrongExplanation:"Evitar herramientas nuevas te deja atrás. Consejo: la mejor forma de aprender software es usándolo. Empieza con un proyecto sencillo."},
+
+{id:36,section:"soft",skill:"pensamiento_critico",text:"Ves una oferta de trabajo que promete 3000â¬/mes sin experiencia. ¿Qué piensas?",
+options:[{text:"Investigo la empresa, busco opiniones y desconfío si no hay datos verificables",scores:{admin:3,comercio:2,obra:2,electro:2,textil:1},correct:true},{text:"Aplico rápidamente, es una gran oportunidad",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Pregunto a amigos si les parece buena",scores:{admin:0,comercio:1,obra:0,electro:0,textil:0},correct:false},{text:"La ignoro, seguro que es estafa",scores:{admin:1,comercio:0,obra:1,electro:1,textil:0},correct:false}],
+idealExplanation:"El pensamiento crítico implica verificar fuentes antes de actuar. Investigar protege tu seguridad laboral y económica.",
+wrongExplanation:"Actuar sin verificar puede llevarte a estafas. Ignorar sin investigar puede hacerte perder oportunidades. Consejo: verifica CIF, busca en LinkedIn, consulta Registro Mercantil."},
+
+{id:37,section:"soft",skill:"pensamiento_critico",text:"Un compañero te asegura que un dato de tu trabajo es incorrecto pero tú crees que no. ¿Qué haces?",
+options:[{text:"Reviso mis fuentes, contrasto y acepto la corrección si tiene razón (o argumento si no)",scores:{admin:3,comercio:1,obra:3,electro:3,textil:0},correct:true},{text:"Le hago caso directamente",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Mantengo mi postura, yo lo he comprobado",scores:{admin:0,comercio:0,obra:0,electro:1,textil:0},correct:false},{text:"Le pido que me demuestre por qué está mal",scores:{admin:1,comercio:1,obra:1,electro:1,textil:1},correct:false}],
+idealExplanation:"Humildad intelectual combinada con rigor analítico es pensamiento crítico de calidad.",
+wrongExplanation:"Ceder sin verificar es credulidad. Cerrarse sin escuchar es terquedad. Consejo: la frase clave es 'Déjame verificarlo y te confirmo'."},
+
+// ââââââ APTITUDES TÃCNICAS (38-50) ââââââ
+{id:38,section:"tecnica",text:"¿Qué asignatura de la ESO te resultaba más interesante?",
+options:[{text:"Economía o Matemáticas aplicadas",scores:{admin:3,comercio:2,obra:1,electro:0,textil:0}},{text:"Lengua, Idiomas o Ciencias Sociales",scores:{admin:1,comercio:3,obra:0,electro:0,textil:1}},{text:"Tecnología, Física o Dibujo Técnico",scores:{admin:0,comercio:0,obra:3,electro:3,textil:0}},{text:"Educación Plástica y Visual",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"Tu asignatura favorita indica tu inclinación profesional natural.",wrongExplanation:"Tu respuesta es válida y orienta hacia una familia profesional concreta."},
+
+{id:39,section:"tecnica",text:"¿Dónde te gustaría hacer prácticas?",
+options:[{text:"Una asesoría fiscal, un banco o RRHH",scores:{admin:3,comercio:0,obra:0,electro:0,textil:0}},{text:"Un centro comercial, agencia de marketing o empresa logística",scores:{admin:0,comercio:3,obra:0,electro:0,textil:0}},{text:"Una constructora, estudio de ingeniería o empresa de telecomunicaciones",scores:{admin:0,comercio:0,obra:3,electro:3,textil:0}},{text:"Un taller de costura, atelier de moda o productora de cine",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"El IES ofrece prácticas en empresas locales y también en el extranjero a través de Erasmus+.",wrongExplanation:"Habla con el Departamento de Orientación para conocer empresas colaboradoras."},
+
+{id:40,section:"tecnica",text:"¿Qué herramienta te gustaría dominar?",
+options:[{text:"Software de contabilidad (Sage, A3, ContaPlus)",scores:{admin:3,comercio:0,obra:0,electro:0,textil:0}},{text:"Plataformas e-commerce y CRM (Shopify, Salesforce)",scores:{admin:0,comercio:3,obra:0,electro:0,textil:0}},{text:"AutoCAD, Civil 3D, Arduino o equipos de telecomunicaciones",scores:{admin:0,comercio:0,obra:2,electro:3,textil:0}},{text:"Programas de diseño de moda y patronaje digital",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"Las herramientas que quieres aprender señalan directamente tu familia profesional.",wrongExplanation:"Consulta las webs de los departamentos del IES para ver qué herramientas se usan en cada ciclo."},
+
+{id:41,section:"tecnica",text:"¿Te gusta trabajar con las manos?",
+options:[{text:"No mucho, prefiero ordenador y documentos",scores:{admin:3,comercio:1,obra:0,electro:0,textil:0}},{text:"Un poco, montando expositores o decoraciones",scores:{admin:0,comercio:3,obra:0,electro:0,textil:1}},{text:"Sí, soldar, cablear, montar, construir",scores:{admin:0,comercio:0,obra:2,electro:3,textil:1}},{text:"Sí, coser, cortar, moldear y crear prendas",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"Tu relación con el trabajo manual indica claramente tu familia profesional.",wrongExplanation:"Cada perfil manual o digital encaja con una familia diferente."},
+
+{id:42,section:"tecnica",text:"¿Cómo te llevas con las matemáticas?",
+options:[{text:"Me gustan: porcentajes, contabilidad, estadística",scores:{admin:3,comercio:1,obra:1,electro:1,textil:0}},{text:"Me defiendo si tienen aplicación práctica",scores:{admin:1,comercio:2,obra:1,electro:1,textil:1}},{text:"Me gustan las aplicadas: cálculos, mediciones",scores:{admin:0,comercio:0,obra:3,electro:3,textil:0}},{text:"No son lo mío, prefiero expresión visual",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"Cada ciclo te enseña las matemáticas que necesitas. No es necesario ser un experto.",wrongExplanation:"Si las matemáticas no son tu fuerte, Textil y Comercio requieren menos cálculo."},
+
+{id:43,section:"tecnica",text:"¿Cómo ves el sector de los drones profesionales?",
+options:[{text:"Interesante para topografía y control de obras",scores:{admin:0,comercio:0,obra:3,electro:2,textil:0}},{text:"Muy atractivo, me gustaría pilotarlos",scores:{admin:0,comercio:0,obra:1,electro:3,textil:0}},{text:"Ãtil para logística y entregas",scores:{admin:1,comercio:3,obra:0,electro:1,textil:0}},{text:"Curioso pero no es lo que más me atrae",scores:{admin:1,comercio:0,obra:0,electro:0,textil:2}}],
+idealExplanation:"El IES ofrece un Curso de Especialización en Drones, formación pionera con gran demanda laboral.",wrongExplanation:"El CE en Drones del IES es una especialización innovadora que complementa varias familias."},
+
+{id:44,section:"tecnica",text:"¿Qué tipo de proyecto fin de ciclo te gustaría hacer?",
+options:[{text:"Un plan de empresa con estudio de viabilidad financiera",scores:{admin:3,comercio:2,obra:0,electro:0,textil:0}},{text:"Un plan de marketing y lanzamiento de producto",scores:{admin:0,comercio:3,obra:0,electro:0,textil:1}},{text:"Un proyecto de obra civil o instalación técnica completa",scores:{admin:0,comercio:0,obra:3,electro:3,textil:0}},{text:"Una colección de moda con desfile",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"El proyecto final refleja tu vocación. En el Aula de Emprendimiento del IES puedes empezar a desarrollar ideas desde primer curso.",wrongExplanation:"Visita el Aula de Emprendimiento del IES para ver proyectos reales de alumnos."},
+
+{id:45,section:"tecnica",text:"¿Te interesa la sostenibilidad y el medio ambiente?",
+options:[{text:"Sí, en la gestión responsable de empresas (RSC)",scores:{admin:3,comercio:1,obra:0,electro:0,textil:0}},{text:"Sí, comercio justo y consumo responsable",scores:{admin:0,comercio:3,obra:0,electro:0,textil:1}},{text:"Sí, energías renovables e instalaciones eficientes",scores:{admin:0,comercio:0,obra:2,electro:3,textil:0}},{text:"Sí, moda sostenible y textiles ecológicos",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"La sostenibilidad es transversal a todas las familias profesionales.",wrongExplanation:"Investiga cómo tu familia favorita contribuye a los ODS de la ONU."},
+
+{id:46,section:"tecnica",text:"¿Qué valor del IES Luis Bueno Crespo te atrae más?",
+options:[{text:"Los ciclos bilingües en inglés",scores:{admin:3,comercio:2,obra:2,electro:1,textil:1}},{text:"Las oportunidades Erasmus+ en el extranjero",scores:{admin:1,comercio:2,obra:1,electro:1,textil:2}},{text:"La certificación MikroTik Academy y tecnología punta",scores:{admin:0,comercio:0,obra:1,electro:3,textil:0}},{text:"El Aula de Emprendimiento y el Aula ATECA",scores:{admin:1,comercio:2,obra:1,electro:1,textil:2}}],
+idealExplanation:"El IES ofrece bilingüismo, Erasmus+, MikroTik Academy, Aula ATECA y Aula de Emprendimiento. Son ventajas competitivas reales.",wrongExplanation:"Aprovecha al máximo los recursos del centro. El bilingüismo y Erasmus+ multiplican tus oportunidades."},
+
+{id:47,section:"tecnica",text:"¿Cómo te imaginas profesionalmente en 5 años?",
+options:[{text:"Gestionando un departamento administrativo o financiero",scores:{admin:3,comercio:0,obra:0,electro:0,textil:0}},{text:"Dirigiendo un equipo de ventas o mi propia tienda online",scores:{admin:0,comercio:3,obra:0,electro:0,textil:0}},{text:"En un proyecto de construcción o instalaciones avanzadas",scores:{admin:0,comercio:0,obra:3,electro:2,textil:0}},{text:"Con mi propio taller de moda o en producción de espectáculos",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"Tu visión a 5 años es uno de los mejores indicadores de tu familia profesional.",wrongExplanation:"Ten un plan pero sé flexible. La FP te da base sólida y el GS da acceso a la universidad."},
+
+{id:48,section:"tecnica",text:"¿Qué tipo de error laboral te preocuparía más?",
+options:[{text:"Un error en un balance contable o declaración fiscal",scores:{admin:3,comercio:0,obra:1,electro:0,textil:0}},{text:"Perder un cliente importante por mala atención",scores:{admin:0,comercio:3,obra:0,electro:0,textil:0}},{text:"Un fallo de seguridad eléctrica o defecto estructural",scores:{admin:0,comercio:0,obra:3,electro:3,textil:0}},{text:"Entregar una prenda con acabado deficiente",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"El tipo de error que más te preocupa indica dónde pones tu máximo estándar de calidad.",wrongExplanation:"En todas las profesiones hay margen de error, pero la prevención es clave. El IES lo cubre en FOL."},
+
+{id:49,section:"tecnica",text:"¿Qué sector tiene más futuro en Andalucía según tu criterio?",
+options:[{text:"Servicios financieros y gestión empresarial",scores:{admin:3,comercio:1,obra:0,electro:0,textil:0}},{text:"Comercio electrónico y logística internacional",scores:{admin:0,comercio:3,obra:0,electro:0,textil:0}},{text:"Construcción sostenible, telecomunicaciones y energías renovables",scores:{admin:0,comercio:0,obra:3,electro:3,textil:0}},{text:"Moda flamenca, artesanía textil y espectáculos",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"Andalucía ofrece oportunidades en todos estos sectores. La clave es elegir lo que te apasione.",wrongExplanation:"Investiga el tejido empresarial de Granada. El IES tiene convenios con empresas locales para FCT."},
+
+{id:50,section:"tecnica",text:"Ãltima pregunta: ¿qué frase te define mejor?",
+options:[{text:"\"Cada céntimo cuenta y cada documento importa\"",scores:{admin:3,comercio:0,obra:0,electro:0,textil:0}},{text:"\"Si sabes conectar con la gente, todo es posible\"",scores:{admin:0,comercio:3,obra:0,electro:0,textil:0}},{text:"\"Construyo y conecto el mundo que nos rodea\"",scores:{admin:0,comercio:0,obra:2,electro:3,textil:0}},{text:"\"La moda es arte que se viste\"",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3}}],
+idealExplanation:"Tu frase-identidad revela tu esencia profesional. No hay correcta ni incorrecta.",wrongExplanation:"Si ninguna te representa, quizá tengas perfil mixto. Explora ciclos de dos familias."}
+];
+
+// âââââââââââââââââââââââââââââââââââââââââââ
+// PREMIOS
+// âââââââââââââââââââââââââââââââââââââââââââ
+const PRIZES=[
+  {emoji:'ð',name:'Cuaderno IES personalizado',desc:'Un cuaderno con el logo del centro.'},
+  {emoji:'ðï¸',name:'Pack de bolígrafos premium',desc:'Set de bolígrafos de colores.'},
+  {emoji:'ð',name:'Bolsa IES Luis Bueno Crespo',desc:'Bolsa de tela exclusiva del centro.'},
+  {emoji:'â',name:'Desayuno gratis en cafetería',desc:'Un desayuno completo en la cafetería.'},
+  {emoji:'ð±',name:'Funda de móvil IES',desc:'Funda personalizada con el escudo.'},
+  {emoji:'ð',name:'Diploma de Excelencia en Soft Skills',desc:'Certificado oficial del Dpto. de Orientación.'},
+  {emoji:'ð',name:'Libro recomendado por tu tutor/a',desc:'Un libro seleccionado por tu departamento.'},
+  {emoji:'ð«',name:'Entrada actividad extraescolar',desc:'Acceso gratuito a la próxima excursión.'},
+  {emoji:'ð§¢',name:'Gorra IES edición limitada',desc:'Gorra deportiva con el logo del centro.'},
+  {emoji:'â­',name:'Punto extra en FOL/Tutoría',desc:'Un punto extra en participación de FOL.'}
+];
+
+function getPrize(code){
+  let h=0;for(let i=0;i<code.length;i++){h=((h<<5)-h)+code.charCodeAt(i);h|=0;}
+  return PRIZES[Math.abs(h)%PRIZES.length];
+}
+
+// âââââââââââââââââââââââââââââââââââââââââââ
+// STATE
+// âââââââââââââââââââââââââââââââââââââââââââ
+let S={screen:'intro',cq:0,ans:{},name:'',prizeCode:''};
+const $=id=>document.getElementById(id);
+const app=document.getElementById('app');
+
+// âââââââââââââââââââââââââââââââââââââââââââ
+// SCORING
+// âââââââââââââââââââââââââââââââââââââââââââ
+function getScores(){
+  const t={admin:0,comercio:0,obra:0,electro:0,textil:0};
+  const mx={admin:0,comercio:0,obra:0,electro:0,textil:0};
+  QS.forEach(q=>{
+    Object.keys(t).forEach(f=>{mx[f]+=Math.max(...q.options.map(o=>o.scores[f]))});
+    if(S.ans[q.id]!==undefined){const c=q.options[S.ans[q.id]];Object.keys(t).forEach(f=>{t[f]+=c.scores[f]})}
+  });
+  const pcts={};Object.keys(t).forEach(f=>{pcts[f]=mx[f]>0?Math.round(t[f]/mx[f]*100):0});
+  return{totals:t,pcts};
+}
+
+function getSoftScores(){
+  const sk={};Object.keys(SSKILLS).forEach(k=>{sk[k]={s:0,m:0,correct:0,total:0}});
+  QS.filter(q=>q.section==='soft').forEach(q=>{
+    const k=q.skill;if(!sk[k])return;sk[k].total++;
+    const mx=Math.max(...q.options.map(o=>Object.values(o.scores).reduce((a,b)=>a+b,0)));
+    sk[k].m+=mx;
+    if(S.ans[q.id]!==undefined){const c=q.options[S.ans[q.id]];sk[k].s+=Object.values(c.scores).reduce((a,b)=>a+b,0);if(c.correct)sk[k].correct++}
+  });
+  return sk;
+}
+
+function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='LBC-';for(let i=0;i<6;i++)r+=c[Math.floor(Math.random()*c.length)];return r}
+
+// âââââââââââââââââââââââââââââââââââââââââââ
+// ENVÃO A GOOGLE SHEETS
+// âââââââââââââââââââââââââââââââââââââââââââ
+function enviarResultados(){
+  if(!SHEETS_URL)return; // Si no hay URL configurada, no envía
+
+  const{pcts}=getScores();
+  const ss=getSoftScores();
+  const sorted=Object.entries(pcts).sort((a,b)=>b[1]-a[1]);
+  let correctas=0,totalEval=0;
+  QS.forEach(q=>{
+    if(q.options.some(o=>o.correct)){totalEval++;
+      if(S.ans[q.id]!==undefined&&q.options[S.ans[q.id]].correct)correctas++}
+  });
+  function ssPct(k){const v=ss[k];return v&&v.m>0?Math.round(v.s/v.m*100):0}
+
+  const payload={
+    nombre:S.name,codigoPremio:S.prizeCode,
+    familia1:FAM[sorted[0][0]].nombre,pctFamilia1:sorted[0][1],
+    familia2:FAM[sorted[1][0]].nombre,pctFamilia2:sorted[1][1],
+    correctas,totalEvaluables:totalEval,
+    pctAcierto:totalEval>0?Math.round(correctas/totalEval*100):0,
+    puntualidad:ssPct('puntualidad'),asertividad:ssPct('asertividad'),
+    donGentes:ssPct('don_gentes'),resolucionConflictos:ssPct('resolucion_conflictos'),
+    negociacion:ssPct('negociacion'),organizacion:ssPct('organizacion'),
+    creatividad:ssPct('creatividad'),trabajoEquipo:ssPct('trabajo_equipo'),
+    adaptabilidad:ssPct('adaptabilidad'),pensamientoCritico:ssPct('pensamiento_critico')
+  };
+
+  fetch(SHEETS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  .then(()=>{const el=$('sentStatus');if(el)el.innerHTML='<span class="sent-ok">â Datos guardados correctamente</span>'})
+  .catch(err=>console.log('Error enviando:',err));
+}
+
+// âââââââââââââââââââââââââââââââââââââââââââ
+// RENDER
+// âââââââââââââââââââââââââââââââââââââââââââ
+function render(){
+  if(S.screen==='intro')renderIntro();
+  else if(S.screen==='name')renderName();
+  else if(S.screen==='quiz')renderQuiz();
+  else if(S.screen==='results')renderResults();
+  else if(S.screen==='teacher')renderTeacher();
+}
+
+function renderIntro(){
+  app.innerHTML=`
+  <div class="hdr">
+    <div class="hdr-badge">IES Luis Bueno Crespo · Armilla (Granada)</div>
+    <h1>Test de Orientación Profesional</h1>
+    <p>50 preguntas para descubrir tu familia profesional ideal y mejorar tus competencias transversales.</p>
+  </div>
+  <div class="card">
+    <h2 style="font-family:'Fraunces',serif;font-size:20px;margin-bottom:10px">¿Cómo funciona?</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:8px"><strong>37 preguntas de Soft Skills</strong> â puntualidad, asertividad, don de gentes, resolución de conflictos, negociación y más.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px"><strong>13 preguntas de Aptitudes Técnicas</strong> â identifican qué familia profesional encaja contigo.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Al finalizar: informe detallado con correcciones, perfil de soft skills, familia recomendada y <strong>código QR con premio</strong>.</p>
+    <div class="chips">
+      <span class="chip c-admin">ð Administración</span>
+      <span class="chip c-comercio">ð Comercio</span>
+      <span class="chip c-obra">ðï¸ Obra Civil</span>
+      <span class="chip c-electro">â¡ Electricidad</span>
+      <span class="chip c-textil">ð§µ Textil</span>
+    </div>
+    <button class="btn" onclick="S.screen='name';render()">Comenzar el test â</button>
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <button class="btn btn-outline" onclick="S.screen='teacher';render()" style="font-size:13px">ð Acceso Profesor â Lector QR</button>
+    </div>
+  </div>
+  <p class="footer">â± 10-15 min · 50 preguntas · Resultados inmediatos con premio</p>`;
+}
+
+function renderName(){
+  app.innerHTML=`
+  <div class="hdr"><h1>¿Cómo te llamas?</h1><p>Tu nombre aparecerá en el informe de resultados.</p></div>
+  <div class="card" style="text-align:center">
+    <input id="nameInput" type="text" placeholder="Escribe tu nombre..."
+      style="width:100%;padding:14px;border:2px solid var(--border);border-radius:10px;font-family:'Outfit';font-size:16px;text-align:center;outline:none"
+      onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'"
+      onkeypress="if(event.key==='Enter')startQuiz()">
+    <br><br><button class="btn" onclick="startQuiz()">Empezar â</button>
+  </div>`;
+  setTimeout(()=>{const i=$('nameInput');if(i)i.focus()},100);
+}
+
+function startQuiz(){
+  const i=$('nameInput');S.name=i?i.value.trim()||'Alumno/a':'Alumno/a';
+  S.screen='quiz';S.cq=0;S.ans={};render();
+}
+
+function renderQuiz(){
+  const q=QS[S.cq],tot=QS.length,pct=Math.round(S.cq/tot*100);
+  const sl=q.section==='soft'?`Soft Skills â ${SSKILLS[q.skill]||''}`:'Aptitudes Técnicas';
+  const sel=S.ans[q.id];
+  app.innerHTML=`
+  <div class="prog-wrap">
+    <div class="prog-top"><strong>Pregunta ${S.cq+1} de ${tot}</strong><span>${pct}%</span></div>
+    <div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div>
+  </div>
+  <div class="sec-label">${sl}</div>
+  <div class="card q-card">
+    <div class="q-num">Pregunta ${q.id}</div>
+    <div class="q-text">${q.text}</div>
+    <div class="opts">${q.options.map((o,i)=>`
+      <button class="opt ${sel===i?'sel':''}" onclick="pick(${i})">
+        <span class="opt-circle"></span><span>${o.text}</span>
+      </button>`).join('')}</div>
+  </div>
+  <div class="nav">
+    <button class="btn btn-outline" onclick="prev()" ${S.cq===0?'disabled':''}>â Anterior</button>
+    ${S.cq===tot-1
+      ?`<button class="btn" onclick="finish()" ${sel===undefined?'disabled':''}>Ver resultados</button>`
+      :`<button class="btn" onclick="next()" ${sel===undefined?'disabled':''}>Siguiente â</button>`}
+  </div>`;
+}
+
+function pick(i){S.ans[QS[S.cq].id]=i;render()}
+function next(){if(S.cq<QS.length-1){S.cq++;render();window.scrollTo({top:0,behavior:'smooth'})}}
+function prev(){if(S.cq>0){S.cq--;render();window.scrollTo({top:0,behavior:'smooth'})}}
+function finish(){S.screen='results';S.prizeCode=genCode();enviarResultados();render();window.scrollTo({top:0,behavior:'smooth'})}
+
+// âââââââââââââââââââââââââââââââââââââââââââ
+// RESULTS
+// âââââââââââââââââââââââââââââââââââââââââââ
+function renderResults(){
+  const{pcts}=getScores();const ss=getSoftScores();
+  const sorted=Object.entries(pcts).sort((a,b)=>b[1]-a[1]);
+  const wk=sorted[0][0],w=FAM[wk],sk2=sorted[1][0];
+  let totalCorrect=0,totalGraded=0;
+  QS.forEach(q=>{const hasC=q.options.some(o=>o.correct);if(hasC){totalGraded++;if(S.ans[q.id]!==undefined&&q.options[S.ans[q.id]].correct)totalCorrect++}});
+
+  const ssEntries=Object.entries(ss).map(([k,v])=>({
+    k,name:SSKILLS[k],pct:v.m>0?Math.round(v.s/v.m*100):0,correct:v.correct,total:v.total
+  })).sort((a,b)=>b.pct-a.pct);
+
+  // Identify weak areas for improvement plan
+  const weakAreas=ssEntries.filter(s=>s.total>0&&s.pct<60).slice(0,3);
+  const okAreas=ssEntries.filter(s=>s.total>0&&s.pct>=60&&s.pct<75).slice(0,2);
+
+  app.innerHTML=`
+  <div style="animation:fadeUp .5s ease">
+    <div class="card res-hero">
+      <div class="emo">${w.emoji}</div>
+      <h2>${w.nombre}</h2>
+      <p class="sub">Tu familia profesional recomendada · ${S.name}</p>
+      <p style="margin-top:10px;font-size:14px;color:var(--green);font-weight:700">${totalCorrect} de ${totalGraded} respuestas correctas en soft skills (${totalGraded>0?Math.round(totalCorrect/totalGraded*100):0}%)</p>
+      <div id="sentStatus"></div>
+    </div>
+
+    <div class="card">${sorted.map(([k,p])=>`
+      <div class="score-card ${k===wk?'win':''}" style="border-left-color:var(--${k})">
+        <div class="sc-top"><h3>${FAM[k].emoji} ${FAM[k].nombre}</h3><span class="sc-pct" style="color:var(--${k})">${p}%</span></div>
+        <div class="sc-bar"><div class="sc-fill" style="width:${p}%;background:var(--${k})"></div></div>
+      </div>`).join('')}</div>
+
+    <div class="card info-section">
+      <h3>ð§  Perfil de Soft Skills</h3>
+      ${ssEntries.map(s=>{
+        const cls=s.pct>=70?'good':s.pct>=50?'ok':'low';
+        const label=s.pct>=70?'â­ Fortaleza':s.pct>=50?'ð¶ Mejorable':'ð´ A trabajar';
+        return `<div class="ss-row"><strong>${s.name}</strong><span>${s.pct}%${s.total>0?' · '+s.correct+'/'+s.total+' correctas':''}</span></div>
+        <div class="ss-bar"><div class="ss-fill" style="width:${s.pct}%;${s.pct<50?'background:var(--red)':s.pct<70?'background:var(--amber)':''}"></div></div>
+        <div class="ss-verdict ${cls}">${label}</div>`}).join('')}
+    </div>
+
+    <div class="card info-section">
+      <h3>ð Informe detallado: Tus respuestas</h3>
+      <p style="margin-bottom:14px;font-size:13px;color:var(--muted)">Cada pregunta incluye si tu respuesta fue correcta y cómo mejorar.</p>
+      <div class="filter-tabs" id="filterTabs">
+        <span class="ftab active" data-f="all" onclick="setFilter('all')">Todas</span>
+        <span class="ftab" data-f="correct" onclick="setFilter('correct')">â Correctas</span>
+        <span class="ftab" data-f="incorrect" onclick="setFilter('incorrect')">â A mejorar</span>
+        <span class="ftab" data-f="neutral" onclick="setFilter('neutral')">â Sin calificar</span>
+      </div>
+      <div id="feedbackList"></div>
+    </div>
+
+    ${weakAreas.length>0||okAreas.length>0?`
+    <div class="card info-section">
+      <h3>ð¯ Tu Plan de Mejora Personal</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Ãreas donde más impacto tendrá tu mejora:</p>
+      ${weakAreas.map((s,i)=>`<div class="improve-box red"><strong>${i+1}. ${s.name} (${s.pct}%)</strong><p>${getImproveTip(s.k)}</p></div>`).join('')}
+      ${okAreas.map((s,i)=>`<div class="improve-box amber"><strong>${weakAreas.length+i+1}. ${s.name} (${s.pct}%)</strong><p>${getImproveTip(s.k)}</p></div>`).join('')}
+    </div>`:''}
+
+    <div class="card info-section">
+      <h3>${w.emoji} Tu perfil: ${w.nombre}</h3>
+      <p>${w.desc}</p>
+      <h4>Ciclos formativos disponibles</h4>
+      <ul>${w.ciclos.map(c=>`<li><strong>${c.n} â ${c.t}</strong>: ${c.d}</li>`).join('')}</ul>
+      <h4>Salidas profesionales</h4><p>${w.salidas}</p>
+      <div class="links" style="margin-top:12px">
+        <a href="${w.url}" target="_blank">Departamento IES</a>
+        <a href="https://iesluisbuenocrespo.es/sin-categoria/oferta-educativa-f-p/" target="_blank">Oferta FP</a>
+        <a href="https://www.todofp.es/" target="_blank">TodoFP</a>
+        <a href="https://www.juntadeandalucia.es/educacion/portales/web/escolarizacion/" target="_blank">Escolarización Junta</a>
+        <a href="https://erasmus.iesluisbuenocrespo.es/er/" target="_blank">Erasmus+</a>
+      </div>
+    </div>
+
+    ${sk2?`<div class="card info-section">
+      <h3>${FAM[sk2].emoji} Segunda opción: ${FAM[sk2].nombre}</h3>
+      <p>${FAM[sk2].desc}</p>
+      <h4>Ciclos</h4><ul>${FAM[sk2].ciclos.map(c=>`<li><strong>${c.n} â ${c.t}</strong>: ${c.d}</li>`).join('')}</ul>
+      <h4>Salidas</h4><p>${FAM[sk2].salidas}</p>
+      <div class="links" style="margin-top:10px"><a href="${FAM[sk2].url}" target="_blank">Departamento IES</a></div>
+    </div>`:''}
+
+    <div class="card qr-section">
+      <h3 style="font-family:'Fraunces',serif;font-size:20px;margin-bottom:4px">ð ¡Tu premio!</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:6px">Muestra este código QR a tu profesor/a para descubrir tu premio.</p>
+      <div class="qr-number">${S.prizeCode}</div>
+      <div class="qr-code" id="qrCodeDiv"></div>
+      <p class="qr-note">El profesor/a escaneará este QR con el panel docente.</p>
+    </div>
+
+    <div class="card info-section">
+      <h3>â¹ï¸ Sobre este test</h3>
+      <p>Herramienta orientativa del IES Luis Bueno Crespo (Armilla, Granada). Complementa con el Departamento de Orientación.</p>
+      <div class="links" style="margin-top:10px">
+        <a href="https://iesluisbuenocrespo.es/" target="_blank">Web IES</a>
+        <a href="https://sites.google.com/g.educaand.es/orientacionlbc/inicio" target="_blank">Orientación</a>
+        <a href="https://sites.google.com/g.educaand.es/auladeemprendimiento/inicio" target="_blank">Emprendimiento</a>
+      </div>
+    </div>
+
+    <button class="btn btn-dark" style="width:100%" onclick="S.screen='intro';render()">ð Repetir el test</button>
+    <button class="btn btn-outline no-print" style="width:100%;margin-top:8px" onclick="window.print()">ð¨ï¸ Imprimir informe</button>
+    <p class="footer">IES Luis Bueno Crespo · Avda. Las Palmeras s/n · 18100 Armilla · â 958 89 37 39</p>
+  </div>`;
+
+  setTimeout(()=>{
+    const qd=$('qrCodeDiv');
+    if(qd&&typeof QRCode!=='undefined'){
+      qd.innerHTML='';
+      new QRCode(qd,{text:JSON.stringify({code:S.prizeCode,name:S.name,family:w.nombre,score:sorted[0][1],date:new Date().toISOString().split('T')[0]}),width:180,height:180,colorDark:"#1b1b1f",colorLight:"#ffffff"});
+    }
+  },200);
+  setTimeout(()=>renderFeedback('all'),50);
+}
+
+function getImproveTip(skill){
+  const tips={
+    puntualidad:'Usa la regla del +15: pon alarmas 15 min antes. Prepara todo la noche anterior. Si vas a llegar tarde, avisa SIEMPRE con antelación.',
+    asertividad:'Practica la técnica «entiendo + pero los datos dicen». No cambies de opinión por presión social si tienes argumentos sólidos.',
+    don_gentes:'Empieza presentándote en situaciones de baja presión. Pregunta «¿Cómo estás?» y escucha la respuesta de verdad. El don de gentes se entrena.',
+    resolucion_conflictos:'Usa la estructura «Situación + Impacto + Petición». Reconoce errores rápido con la fórmula «Error + Disculpa + Plan de acción».',
+    negociacion:'Antes de negociar, investiga siempre. Lleva datos comparativos. Busca opciones donde ambas partes ganen (win-win).',
+    organizacion:'Dedica 5 min cada noche a planificar el día siguiente. Instala Google Calendar o Notion. Establece convención de nombres para archivos.',
+    creatividad:'Explora fuentes de inspiración diversas. Combina tu estilo creativo con otros estilos diferentes en equipo.',
+    trabajo_equipo:'Ofrece ayuda específica, no genérica. Reconoce las aportaciones de cada persona. Di «Hemos» en lugar de «He».',
+    adaptabilidad:'Ante cambios, pregúntate «¿Qué puedo aprender aquí?». La mejor forma de aprender software nuevo es usándolo directamente.',
+    pensamiento_critico:'Verifica siempre las fuentes antes de actuar. Usa la frase «Déjame verificarlo y te confirmo» ante datos dudosos.'
+  };
+  return tips[skill]||'Trabaja esta competencia con práctica diaria y reflexión.';
+}
+
+function renderFeedback(filter){
+  const c=$('feedbackList');if(!c)return;
+  let html='';
+  QS.forEach(q=>{
+    const sel=S.ans[q.id];const chosen=sel!==undefined?q.options[sel]:null;
+    const hasC=q.options.some(o=>o.correct);const isC=chosen&&chosen.correct;
+    const correctOpt=q.options.find(o=>o.correct);
+    let status,cls;
+    if(!hasC){status='neutral';cls='partial'}
+    else if(isC){status='correct';cls='correct'}
+    else{status='incorrect';cls='incorrect'}
+    if(filter!=='all'&&filter!==status)return;
+    const icon=status==='correct'?'Correcta':status==='incorrect'?'A mejorar':'Orientativa';
+    const chosenText=chosen?chosen.text:'(Sin responder)';
+    html+=`<div class="fb-item ${cls}" data-type="${status}">
+      <span class="fb-icon">${icon}</span>
+      <div class="fb-q">${q.id}. ${q.text}</div>
+      <div class="fb-ans yours"><div class="label">Tu respuesta${isC?' â':hasC?' â':''}</div>${chosenText}</div>
+      ${hasC&&correctOpt&&!isC?`<div class="fb-ans ideal"><div class="label" style="color:var(--green)">Respuesta recomendada â</div>${correctOpt.text}</div>`:''}
+      <div class="fb-explain">${isC||!hasC?'<strong>'+(isC?'¡Correcto! ':'ð¡ Orientación: ')+'</strong>'+q.idealExplanation:'<strong>¿Cómo mejorar?</strong> '+q.wrongExplanation}</div>
+    </div>`;
+  });
+  c.innerHTML=html;
+}
+
+window.setFilter=function(f){
+  document.querySelectorAll('.ftab').forEach(t=>t.classList.toggle('active',t.dataset.f===f));
+  renderFeedback(f);
+};
+
+// âââââââââââââââââââââââââââââââââââââââââââ
+// TEACHER PANEL
+// âââââââââââââââââââââââââââââââââââââââââââ
+function renderTeacher(){
+  app.innerHTML=`
+  <div class="hdr">
+    <div class="hdr-badge">Panel Docente</div>
+    <h1>Lector de Códigos QR</h1>
+    <p>Escanea el QR del alumno/a para ver su código de premio.</p>
+  </div>
+  <div class="card" style="text-align:center">
+    <video id="teacherVideo" style="width:100%;max-width:400px;border-radius:12px;border:3px solid var(--green);margin:0 auto;display:block" playsinline></video>
+    <canvas id="teacherCanvas" style="display:none"></canvas>
+    <p id="scanStatus" style="margin-top:12px;font-size:14px;color:var(--muted)">Iniciando cámara...</p>
+    <div id="scanResult" style="margin-top:16px"></div>
+  </div>
+  <div class="card" style="text-align:center">
+    <h3 style="font-family:'Fraunces',serif;font-size:18px;margin-bottom:10px">O introduce el código manualmente</h3>
+    <input id="manualCode" type="text" placeholder="Ej: LBC-A3K9N2"
+      style="width:100%;max-width:300px;padding:12px;border:2px solid var(--border);border-radius:10px;font-family:'Outfit';font-size:16px;text-align:center;outline:none;margin-bottom:12px"
+      onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'">
+    <br><button class="btn" onclick="manualLookup()">Buscar código</button>
+    <div id="manualResult" style="margin-top:16px"></div>
+  </div>
+  <button class="btn btn-outline" style="width:100%;margin-top:8px" onclick="stopCamera();S.screen='intro';render()">â Volver al test</button>
+  <p class="footer">Panel exclusivo para profesorado del IES Luis Bueno Crespo</p>`;
+  startCamera();
+}
+
+let cameraStream=null,scanInterval=null;
+function startCamera(){
+  const v=$('teacherVideo'),cn=$('teacherCanvas'),st=$('scanStatus');
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){st.textContent='â Cámara no soportada. Usa el campo manual.';return}
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
+  .then(stream=>{cameraStream=stream;v.srcObject=stream;v.play();st.textContent='ð· Cámara activa. Apunta al QR del alumno/a.';
+    const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
+    sc.onload=()=>{scanInterval=setInterval(()=>scanFrame(v,cn),300)};
+    sc.onerror=()=>{st.textContent='â ï¸ No se pudo cargar el lector QR. Usa el campo manual.'};
+    document.head.appendChild(sc);
+  }).catch(()=>{st.textContent='â ï¸ No se pudo acceder a la cámara. Usa el campo manual.'});
+}
+
+function scanFrame(v,cn){
+  if(!v||v.readyState!==v.HAVE_ENOUGH_DATA)return;
+  const ctx=cn.getContext('2d');cn.width=v.videoWidth;cn.height=v.videoHeight;
+  ctx.drawImage(v,0,0);const img=ctx.getImageData(0,0,cn.width,cn.height);
+  if(typeof jsQR==='undefined')return;
+  const code=jsQR(img.data,img.width,img.height);
+  if(code){clearInterval(scanInterval);processQR(code.data,'scanResult');$('scanStatus').textContent='â ¡QR leído correctamente!';}
+}
+
+function stopCamera(){if(scanInterval)clearInterval(scanInterval);if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null}}
+
+function processQR(data,tid){
+  const t=$(tid);
+  try{const info=JSON.parse(data);const prize=getPrize(info.code);
+    t.innerHTML=`<div class="card" style="border:2px solid var(--green);text-align:left">
+      <h3 style="font-family:'Fraunces',serif;font-size:20px;color:var(--green);margin-bottom:12px">ð Datos del alumno/a</h3>
+      <p><strong>Nombre:</strong> ${info.name||'â'}</p>
+      <p><strong>Código:</strong> ${info.code||'â'}</p>
+      <p><strong>Familia recomendada:</strong> ${info.family||'â'}</p>
+      <p><strong>Puntuación:</strong> ${info.score||'â'}%</p>
+      <p><strong>Fecha:</strong> ${info.date||'â'}</p>
+      <div style="margin-top:16px;padding:16px;background:var(--green-light);border-radius:10px;text-align:center">
+        <div class="prize-label">Premio asignado</div>
+        <div class="prize-name">${prize.emoji} ${prize.name}</div>
+        <div class="prize-desc">${prize.desc}</div>
+      </div></div>`;
+  }catch(e){t.innerHTML=`<div class="card" style="border:2px solid var(--red);text-align:center"><p style="color:var(--red);font-weight:600">â ï¸ Código no reconocido.</p></div>`}
+}
+
+function manualLookup(){
+  const code=($('manualCode')||{}).value;
+  if(!code||!code.trim()){$('manualResult').innerHTML='<p style="color:var(--red)">Introduce un código.</p>';return}
+  const prize=getPrize(code.trim().toUpperCase());
+  $('manualResult').innerHTML=`<div class="card" style="border:2px solid var(--green);text-align:center">
+    <p style="font-size:12px;color:var(--green);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Código: ${code.trim().toUpperCase()}</p>
+    <div class="prize-label">Premio asignado</div>
+    <div class="prize-name">${prize.emoji} ${prize.name}</div>
+    <div class="prize-desc">${prize.desc}</div></div>`;
+}
+
+render();
+</script>
+</body>
+</html>
