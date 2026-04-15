@@ -122,13 +122,27 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 <div class="app" id="app"></div>
 
 <script>
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// â  CONFIGURACIÃN â CAMBIA SOLO ESTA LÃNEA             â
-// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-// Pega aquí la URL de tu Google Apps Script (Paso 2 de la guía)
-// Si aún no la tienes, déjala vacía y los datos no se enviarán
-const SHEETS_URL = '';
-// Ejemplo: const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbx.../exec';
+// ════════════════════════════════════════════════════════
+//   CONFIGURACIÓN — CAMBIA SOLO ESTA LÍNEA
+// ════════════════════════════════════════════════════════
+// Pega aquí la URL de tu Google Apps Script Web App (guía en apps-script.gs)
+// Ejemplo: const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbx.../exec';
+const BACKEND_URL = '';
+
+// Llama al backend. Usa text/plain para evitar preflight CORS.
+async function apiCall(action, body){
+  if(!BACKEND_URL) throw new Error('Backend no configurado. Edita BACKEND_URL en index.html');
+  const payload = Object.assign({action:action}, body||{});
+  const res = await fetch(BACKEND_URL, {
+    method:'POST',
+    redirect:'follow',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if(!data.ok) throw new Error(data.error || 'error backend');
+  return data;
+}
 
 // âââââââââââââââââââââââââââââââââââââââââââ
 // FAMILIAS PROFESIONALES IES LUIS BUENO CRESPO
@@ -418,34 +432,12 @@ idealExplanation:"Tu frase-identidad revela tu esencia profesional. No hay corre
 ];
 
 // ═════════════════════════════════════════
-// SISTEMA DE PREMIOS (configurable por familia)
+// SISTEMA DE PREMIOS (backend: Google Apps Script)
 // ═════════════════════════════════════════
-const TEACHER_PASSWORD = 'profesor26';
 const PRIZE_TYPES = [1,2,3];
-const DEFAULT_PRIZE_CONFIG = {
-  admin:    {names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'], counts:[10,5,2]},
-  comercio: {names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'], counts:[10,5,2]},
-  obra:     {names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'], counts:[10,5,2]},
-  electro:  {names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'], counts:[10,5,2]},
-  textil:   {names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'], counts:[10,5,2]}
-};
-
-function loadPrizeConfig(){
-  try{
-    const s=localStorage.getItem('lbc_prizeConfig');
-    if(s){
-      const parsed=JSON.parse(s);
-      // merge with defaults to handle new families
-      const merged=JSON.parse(JSON.stringify(DEFAULT_PRIZE_CONFIG));
-      Object.keys(parsed).forEach(k=>{if(merged[k])merged[k]=parsed[k]});
-      return merged;
-    }
-  }catch(e){}
-  return JSON.parse(JSON.stringify(DEFAULT_PRIZE_CONFIG));
-}
-function savePrizeConfig(c){try{localStorage.setItem('lbc_prizeConfig',JSON.stringify(c))}catch(e){}}
-function loadScanned(){try{return JSON.parse(localStorage.getItem('lbc_scannedCodes')||'{}')}catch(e){return{}}}
-function saveScanned(s){try{localStorage.setItem('lbc_scannedCodes',JSON.stringify(s))}catch(e){}}
+// Sesión profesor (en memoria; se borra al cerrar sesión o refrescar)
+let teacherPassword = '';
+let cachedStock = null;
 
 function pickRandomPrizeType(){return PRIZE_TYPES[Math.floor(Math.random()*PRIZE_TYPES.length)]}
 
@@ -487,7 +479,7 @@ function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='LBC-';for(l
 // ENVÃO A GOOGLE SHEETS
 // âââââââââââââââââââââââââââââââââââââââââââ
 function enviarResultados(){
-  if(!SHEETS_URL)return; // Si no hay URL configurada, no envía
+  if(!BACKEND_URL)return; // Sin backend configurado, no envía
 
   const{pcts}=getScores();
   const ss=getSoftScores();
@@ -500,7 +492,7 @@ function enviarResultados(){
   function ssPct(k){const v=ss[k];return v&&v.m>0?Math.round(v.s/v.m*100):0}
 
   const payload={
-    nombre:S.name,codigoPremio:S.prizeCode,
+    nombre:S.name,codigoPremio:S.prizeCode,tipoPremio:S.prizeType,
     familia1:FAM[sorted[0][0]].nombre,pctFamilia1:sorted[0][1],
     familia2:FAM[sorted[1][0]].nombre,pctFamilia2:sorted[1][1],
     correctas,totalEvaluables:totalEval,
@@ -512,7 +504,7 @@ function enviarResultados(){
     adaptabilidad:ssPct('adaptabilidad'),pensamientoCritico:ssPct('pensamiento_critico')
   };
 
-  fetch(SHEETS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  apiCall('submitResults',payload)
   .then(()=>{const el=$('sentStatus');if(el)el.innerHTML='<span class="sent-ok">✅ Datos guardados correctamente</span>'})
   .catch(err=>console.log('Error enviando:',err));
 }
@@ -810,23 +802,34 @@ window.selectFam=function(k){
   document.querySelectorAll('#famPicker .opt').forEach(b=>b.classList.toggle('sel',b.dataset.fam===k));
 };
 
-window.teacherLogin=function(){
+window.teacherLogin=async function(){
   const pw=($('teacherPass')||{}).value||'';
   const err=$('loginErr');
-  if(pw!==TEACHER_PASSWORD){err.textContent='Contraseña incorrecta.';return}
+  const btn=document.querySelector('.btn[onclick="teacherLogin()"]');
+  if(!pw){err.textContent='Introduce la contraseña.';return}
   if(!S.teacherFamily){err.textContent='Selecciona una familia profesional.';return}
-  err.textContent='';
-  S.screen='teacher';render();
+  if(!BACKEND_URL){err.textContent='Backend no configurado. Revisa BACKEND_URL en index.html.';return}
+  err.textContent='Conectando…';
+  if(btn){btn.disabled=true;btn.style.opacity='0.6'}
+  try{
+    const data=await apiCall('login',{password:pw,family:S.teacherFamily});
+    teacherPassword=pw;
+    cachedStock=data.stock;
+    err.textContent='';
+    S.screen='teacher';render();
+  }catch(e){
+    err.textContent=e.message==='unauthorized'?'Contraseña incorrecta.':('Error: '+e.message);
+    if(btn){btn.disabled=false;btn.style.opacity='1'}
+  }
 };
 
 // ═════════════════════════════════════════
 // TEACHER PANEL (menu + scanner)
 // ═════════════════════════════════════════
 function renderTeacher(){
-  const cfg=loadPrizeConfig();
   const fk=S.teacherFamily;
   const fam=FAM[fk];
-  const fc=cfg[fk];
+  const fc=(cachedStock&&cachedStock[fk])||{names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'],counts:[0,0,0]};
   app.innerHTML=`
   <div class="hdr">
     <div class="hdr-badge">Panel Docente · ${fam.nombre}</div>
@@ -880,32 +883,51 @@ function renderTeacher(){
   <button class="btn btn-outline" style="width:100%" onclick="teacherLogout()">🚪 Cerrar sesión</button>
   <p class="footer">IES Luis Bueno Crespo · Panel Docente</p>`;
   startCamera();
+  // refresco en segundo plano para ver cambios de otros profes
+  syncStock();
 }
 
-window.teacherLogout=function(){stopCamera();S.teacherFamily=null;S.screen='intro';render()};
+window.teacherLogout=function(){stopCamera();teacherPassword='';cachedStock=null;S.teacherFamily=null;S.screen='intro';render()};
+
+async function syncStock(updateArgs){
+  const body=Object.assign({password:teacherPassword,family:S.teacherFamily},updateArgs||{});
+  const action=updateArgs?'updatePrize':'getStock';
+  try{
+    const data=await apiCall(action,body);
+    if(data.stock){cachedStock=data.stock;refreshCounters()}
+  }catch(e){
+    const st=$('scanStatus');if(st)st.textContent='⚠️ Error de conexión: '+e.message;
+  }
+}
 
 window.updatePrizeName=function(idx,val){
-  const cfg=loadPrizeConfig();cfg[S.teacherFamily].names[idx]=val.trim()||('Premio tipo '+(idx+1));
-  savePrizeConfig(cfg);
+  const n=val.trim()||('Premio tipo '+(idx+1));
+  if(cachedStock&&cachedStock[S.teacherFamily])cachedStock[S.teacherFamily].names[idx]=n;
+  syncStock({index:idx,name:n});
 };
 
 window.setCount=function(idx,val){
   const n=Math.max(0,parseInt(val,10)||0);
-  const cfg=loadPrizeConfig();cfg[S.teacherFamily].counts[idx]=n;savePrizeConfig(cfg);
+  if(cachedStock&&cachedStock[S.teacherFamily])cachedStock[S.teacherFamily].counts[idx]=n;
   refreshCounters();
+  syncStock({index:idx,count:n});
 };
 
 window.adjustCount=function(idx,delta){
-  const cfg=loadPrizeConfig();
-  cfg[S.teacherFamily].counts[idx]=Math.max(0,(cfg[S.teacherFamily].counts[idx]||0)+delta);
-  savePrizeConfig(cfg);refreshCounters();
+  const fc=cachedStock&&cachedStock[S.teacherFamily];
+  if(!fc)return;
+  const n=Math.max(0,(fc.counts[idx]||0)+delta);
+  fc.counts[idx]=n;
+  refreshCounters();
+  syncStock({index:idx,count:n});
 };
 
 function refreshCounters(){
-  const cfg=loadPrizeConfig();const fc=cfg[S.teacherFamily];
+  const fc=cachedStock&&cachedStock[S.teacherFamily];if(!fc)return;
   [0,1,2].forEach(i=>{
     const el=$('cnt-'+i);if(el)el.textContent=fc.counts[i];
-    const inp=$('pcnt-'+i);if(inp)inp.value=fc.counts[i];
+    const inp=$('pcnt-'+i);if(inp&&document.activeElement!==inp)inp.value=fc.counts[i];
+    const nm=$('pname-'+i);if(nm&&document.activeElement!==nm)nm.value=fc.names[i]||'';
   });
   const tot=$('totalCount');if(tot)tot.textContent=fc.counts.reduce((a,b)=>a+b,0);
 }
@@ -944,34 +966,40 @@ function scanFrame(v,cn){
 
 function stopCamera(){if(scanInterval){clearInterval(scanInterval);scanInterval=null}if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null}}
 
-function redeemPrize(info,tid){
+async function redeemPrize(info,tid){
   const t=$(tid);
-  const cfg=loadPrizeConfig();const fk=S.teacherFamily;const fc=cfg[fk];
+  const fk=S.teacherFamily;
   const pt=parseInt(info.prizeType,10);
-  const idx=pt-1;
-  const scanned=loadScanned();
-  const alreadyScanned=!!scanned[info.code];
+  t.innerHTML=`<div class="card" style="text-align:center"><p style="color:var(--muted)">Canjeando premio…</p></div>`;
 
-  let stockNote='',decremented=false;
-  if(!alreadyScanned){
-    if(fc.counts[idx]>0){
-      fc.counts[idx]=fc.counts[idx]-1;
-      savePrizeConfig(cfg);
-      scanned[info.code]={family:fk,prizeType:pt,name:info.name,date:new Date().toISOString()};
-      saveScanned(scanned);
-      decremented=true;
-      stockNote=`<p style="font-size:12px;color:var(--green);margin-top:6px">✓ Descontado del stock. Quedan <strong>${fc.counts[idx]}</strong> premios de tipo ${pt}.</p>`;
-    }else{
-      stockNote=`<p style="font-size:12px;color:var(--red);margin-top:6px">⚠️ Sin stock disponible de tipo ${pt}. Asigna otro premio manualmente.</p>`;
-    }
-  }else{
-    const prev=scanned[info.code];
-    stockNote=`<p style="font-size:12px;color:var(--amber);margin-top:6px">⚠️ Este código ya fue canjeado anteriormente (${(prev&&prev.date||'').slice(0,10)}). No se descuenta de nuevo.</p>`;
+  let data;
+  try{
+    data=await apiCall('redeem',{
+      password:teacherPassword,
+      family:fk,
+      prizeType:pt,
+      code:info.code,
+      studentName:info.name||''
+    });
+  }catch(e){
+    t.innerHTML=`<div class="card" style="border:2px solid var(--red)"><p style="color:var(--red);font-weight:600">⚠️ Error de conexión: ${e.message}</p></div>`;
+    return;
   }
 
-  const prizeName=fc.names[idx]||('Premio tipo '+pt);
-  const familyMatch=info.familyKey===fk;
+  if(data.stock){cachedStock=data.stock;refreshCounters()}
+  const prizeName=data.prizeName||('Premio tipo '+pt);
 
+  let stockNote='';
+  if(data.redeemed){
+    stockNote=`<p style="font-size:12px;color:var(--green);margin-top:6px">✓ Descontado del stock. Quedan <strong>${data.remaining}</strong> premios de tipo ${pt}.</p>`;
+  }else if(data.alreadyRedeemed){
+    const prev=data.previousScan||{};
+    stockNote=`<p style="font-size:12px;color:var(--amber);margin-top:6px">⚠️ Este código ya fue canjeado anteriormente (${(prev.date||'').slice(0,10)}). No se descuenta de nuevo.</p>`;
+  }else if(data.noStock){
+    stockNote=`<p style="font-size:12px;color:var(--red);margin-top:6px">⚠️ Sin stock disponible de tipo ${pt}. Asigna otro premio manualmente.</p>`;
+  }
+
+  const familyMatch=info.familyKey===fk;
   t.innerHTML=`<div class="card" style="border:2px solid var(--green);margin-bottom:0">
     <h3 style="font-family:'Fraunces',serif;font-size:18px;color:var(--green);margin-bottom:10px">🎓 Datos del alumno/a</h3>
     <p style="font-size:13px"><strong>Nombre:</strong> ${info.name||'—'}</p>
@@ -986,7 +1014,6 @@ function redeemPrize(info,tid){
       ${stockNote}
     </div>
   </div>`;
-  refreshCounters();
 }
 
 function processQR(data,tid){
