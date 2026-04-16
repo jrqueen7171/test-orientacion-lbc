@@ -1326,7 +1326,7 @@ function setPrizeMode(mode){
   const div=$('prizeConfig');if(!div)return;
 
   if(mode==='uniform'){
-    const ref=ini[FAMILIES[0]]||{names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'],counts:[10,5,2]};
+    const ref=ini[Object.keys(FAM)[0]]||{names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'],counts:[10,5,2]};
     div.innerHTML=[0,1,2].map(i=>`
       <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
         <span style="font-size:11px;font-weight:700;color:var(--green);width:50px">Tipo ${i+1}</span>
