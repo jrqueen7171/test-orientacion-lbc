@@ -1,8 +1,8 @@
 // Backend Cloud Run para Test de Orientación Profesional IES Luis Bueno Crespo
-// - Firestore para el stock de premios y los códigos canjeados (atómico vía runTransaction)
-// - Google Sheets para el log de escaneos y los resultados del test
-// - Contraseña del profesor en Secret Manager (env var TEACHER_PASSWORD)
-// - OTP por email (nodemailer + Gmail) para validar el correo del alumnado
+// - Firestore: stock, canjes, resultados, progreso, config (admin)
+// - Google Sheets: log de escaneos y resultados
+// - OTP por email (nodemailer + Gmail)
+// - Panel admin: contraseñas, premios, estadísticas, modo pruebas/en vivo
 
 const express = require('express');
 const crypto = require('crypto');
@@ -13,18 +13,20 @@ const { google } = require('googleapis');
 const FAMILIES = ['admin', 'comercio', 'obra', 'electro', 'textil'];
 const PRIZE_TYPES = [1, 2, 3];
 
-const TEACHER_PASSWORD = process.env.TEACHER_PASSWORD || '';
+const TEACHER_PASSWORD_DEFAULT = process.env.TEACHER_PASSWORD || 'profesor26';
+const ADMIN_PASSWORD_DEFAULT = process.env.ADMIN_PASSWORD || 'admin2026';
 const SHEET_ID = process.env.SHEET_ID || '';
 const GMAIL_USER = process.env.GMAIL_USER || '';
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';
 
-const OTP_EXPIRY_MS = 15 * 60 * 1000;          // código válido 15 min
-const OTP_RESEND_COOLDOWN_MS = 60 * 1000;      // 1 reenvío cada 60 s
+const OTP_EXPIRY_MS = 15 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // sesión 7 días
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const db = new Firestore();
 const STOCK_DOC = db.collection('lbc_orientacion').doc('stock');
+const CONFIG_DOC = db.collection('lbc_orientacion').doc('config');
 const SCANS_COL = db.collection('lbc_orientacion_scans');
 const RESULTS_COL = db.collection('lbc_orientacion_results');
 const OTPS_COL = db.collection('lbc_orientacion_otps');
@@ -46,7 +48,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/', (req, res) => {
-  res.json({ ok: true, service: 'lbc-orientacion', version: 1 });
+  res.json({ ok: true, service: 'lbc-orientacion', version: 2 });
 });
 
 app.post(['/', '/api'], async (req, res) => {
@@ -60,15 +62,25 @@ app.post(['/', '/api'], async (req, res) => {
     const action = body.action || '';
     let result;
     switch (action) {
+      // Teacher
       case 'login':         result = await actionLogin(body); break;
       case 'getStock':      result = await actionGetStock(body); break;
-      case 'updatePrize':   result = await actionUpdatePrize(body); break;
       case 'redeem':        result = await actionRedeem(body); break;
+      // Admin
+      case 'adminLogin':    result = await actionAdminLogin(body); break;
+      case 'adminSetTeacherPassword': result = await actionAdminSetTeacherPassword(body); break;
+      case 'adminSetAdminPassword':   result = await actionAdminSetAdminPassword(body); break;
+      case 'adminSetPrizes': result = await actionAdminSetPrizes(body); break;
+      case 'adminResetTestMode': result = await actionAdminResetTestMode(body); break;
+      case 'adminGetStats':  result = await actionAdminGetStats(body); break;
+      // Student
+      case 'getMode':       result = await actionGetMode(); break;
       case 'requestOtp':    result = await actionRequestOtp(body); break;
       case 'verifyOtp':     result = await actionVerifyOtp(body); break;
       case 'saveProgress':  result = await actionSaveProgress(body); break;
       case 'submitResults': result = await actionSubmitResults(body); break;
       case 'getMyResults':  result = await actionGetMyResults(body); break;
+      case 'retakeTest':    result = await actionRetakeTest(body); break;
       default:              result = { ok: false, error: 'accion desconocida: ' + action };
     }
     res.json(result);
@@ -77,11 +89,35 @@ app.post(['/', '/api'], async (req, res) => {
   }
 });
 
+/* ───── config ───── */
+
+async function readConfig() {
+  const snap = await CONFIG_DOC.get();
+  if (snap.exists) return snap.data();
+  const defaults = {
+    teacherPassword: TEACHER_PASSWORD_DEFAULT,
+    adminPassword: ADMIN_PASSWORD_DEFAULT,
+    liveMode: false,
+    configuredAt: null,
+  };
+  await CONFIG_DOC.set(defaults);
+  return defaults;
+}
+
 /* ───── auth ───── */
 
-function checkAuth(body) {
-  if (!TEACHER_PASSWORD) throw new Error('TEACHER_PASSWORD no configurada en el servidor');
-  if (!body.password || body.password !== TEACHER_PASSWORD) throw new Error('unauthorized');
+async function checkTeacherAuth(body) {
+  const cfg = await readConfig();
+  const pw = cfg.teacherPassword || TEACHER_PASSWORD_DEFAULT;
+  if (!body.password || body.password !== pw) throw new Error('unauthorized');
+  return cfg;
+}
+
+async function checkAdminAuth(body) {
+  const cfg = await readConfig();
+  const pw = cfg.adminPassword || ADMIN_PASSWORD_DEFAULT;
+  if (!body.adminPassword || body.adminPassword !== pw) throw new Error('unauthorized');
+  return cfg;
 }
 
 /* ───── stock ───── */
@@ -89,7 +125,7 @@ function checkAuth(body) {
 function defaultStockFamily() {
   return {
     names: ['Premio tipo 1', 'Premio tipo 2', 'Premio tipo 3'],
-    counts: [10, 5, 2],
+    counts: [0, 0, 0],
   };
 }
 
@@ -107,51 +143,27 @@ async function readStock() {
   const snap = await STOCK_DOC.get();
   const raw = snap.exists ? snap.data() : {};
   const merged = mergeDefaults(raw);
-  if (!snap.exists) {
-    await STOCK_DOC.set(merged);
-  }
+  if (!snap.exists) await STOCK_DOC.set(merged);
   return merged;
 }
 
-/* ───── actions ───── */
+/* ───── teacher actions ───── */
 
 async function actionLogin(body) {
-  checkAuth(body);
+  const cfg = await checkTeacherAuth(body);
   if (!FAMILIES.includes(body.family)) return { ok: false, error: 'familia no válida' };
   const stock = await readStock();
-  return { ok: true, family: body.family, stock };
+  return { ok: true, family: body.family, stock, liveMode: !!cfg.liveMode, initialStock: cfg.initialStock || null };
 }
 
 async function actionGetStock(body) {
-  checkAuth(body);
-  return { ok: true, stock: await readStock() };
-}
-
-async function actionUpdatePrize(body) {
-  checkAuth(body);
-  const f = body.family;
-  if (!FAMILIES.includes(f)) return { ok: false, error: 'familia no válida' };
-  const idx = parseInt(body.index, 10);
-  if (isNaN(idx) || idx < 0 || idx > 2) return { ok: false, error: 'índice no válido' };
-
-  const stock = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(STOCK_DOC);
-    const data = mergeDefaults(snap.exists ? snap.data() : {});
-    if (body.name !== undefined) {
-      const n = String(body.name).slice(0, 80).trim();
-      data[f].names[idx] = n || ('Premio tipo ' + (idx + 1));
-    }
-    if (body.count !== undefined) {
-      data[f].counts[idx] = Math.max(0, parseInt(body.count, 10) || 0);
-    }
-    tx.set(STOCK_DOC, data);
-    return data;
-  });
-  return { ok: true, stock };
+  const cfg = await checkTeacherAuth(body);
+  return { ok: true, stock: await readStock(), liveMode: !!cfg.liveMode, initialStock: cfg.initialStock || null };
 }
 
 async function actionRedeem(body) {
-  checkAuth(body);
+  const cfg = await checkTeacherAuth(body);
+  if (!cfg.liveMode) return { ok: false, error: 'El sistema está en modo pruebas. El administrador debe configurar los premios primero.' };
   const f = body.family;
   if (!FAMILIES.includes(f)) return { ok: false, error: 'familia no válida' };
   const pt = parseInt(body.prizeType, 10);
@@ -160,15 +172,8 @@ async function actionRedeem(body) {
   const code = String(body.code || '').trim();
   if (!code) return { ok: false, error: 'código vacío' };
 
-  // Si el QR lleva familyKey, debe coincidir con la familia del profesor
-  // (cada stand sólo canjea los premios de su propia familia)
   if (body.qrFamilyKey && body.qrFamilyKey !== f) {
-    return {
-      ok: true,
-      wrongStand: true,
-      expectedFamily: body.qrFamilyKey,
-      teacherFamily: f,
-    };
+    return { ok: true, wrongStand: true, expectedFamily: body.qrFamilyKey, teacherFamily: f };
   }
 
   const scanRef = SCANS_COL.doc(code);
@@ -179,46 +184,131 @@ async function actionRedeem(body) {
     const prizeName = data[f].names[idx];
 
     if (scanSnap.exists) {
-      return {
-        alreadyRedeemed: true,
-        previousScan: scanSnap.data(),
-        stock: data,
-        prizeName,
-        prizeType: pt,
-      };
+      return { alreadyRedeemed: true, previousScan: scanSnap.data(), stock: data, prizeName, prizeType: pt };
     }
     if (data[f].counts[idx] <= 0) {
-      return {
-        noStock: true,
-        stock: data,
-        prizeName,
-        prizeType: pt,
-      };
+      return { noStock: true, stock: data, prizeName, prizeType: pt };
     }
     data[f].counts[idx] -= 1;
-    const scanDoc = {
-      family: f,
-      prizeType: pt,
-      studentName: body.studentName || '',
-      date: new Date().toISOString(),
-    };
+    const scanDoc = { family: f, prizeType: pt, studentName: body.studentName || '', date: new Date().toISOString() };
     tx.set(STOCK_DOC, data);
     tx.set(scanRef, scanDoc);
-    return {
-      redeemed: true,
-      stock: data,
-      prizeName,
-      prizeType: pt,
-      remaining: data[f].counts[idx],
-    };
+    return { redeemed: true, stock: data, prizeName, prizeType: pt, remaining: data[f].counts[idx] };
   });
 
   if (result.redeemed) {
-    // log best-effort fuera de la transacción
     appendScanLog(body, result.prizeName).catch((e) => console.log('sheet log error:', e.message));
   }
 
   return { ok: true, ...result };
+}
+
+/* ───── admin actions ───── */
+
+async function actionAdminLogin(body) {
+  const cfg = await checkAdminAuth(body);
+  const stock = await readStock();
+  return { ok: true, config: cfg, stock };
+}
+
+async function actionAdminSetTeacherPassword(body) {
+  await checkAdminAuth(body);
+  const np = String(body.newPassword || '').trim();
+  if (!np || np.length < 4) return { ok: false, error: 'La contraseña debe tener al menos 4 caracteres.' };
+  await CONFIG_DOC.update({ teacherPassword: np });
+  return { ok: true };
+}
+
+async function actionAdminSetAdminPassword(body) {
+  await checkAdminAuth(body);
+  const np = String(body.newPassword || '').trim();
+  if (!np || np.length < 4) return { ok: false, error: 'La contraseña debe tener al menos 4 caracteres.' };
+  await CONFIG_DOC.update({ adminPassword: np });
+  return { ok: true };
+}
+
+async function actionAdminSetPrizes(body) {
+  await checkAdminAuth(body);
+  const mode = body.mode; // 'uniform' or 'custom'
+  let newStock = {};
+
+  if (mode === 'uniform') {
+    const names = body.names || ['Premio tipo 1', 'Premio tipo 2', 'Premio tipo 3'];
+    const counts = (body.counts || [0, 0, 0]).map(c => Math.max(0, parseInt(c, 10) || 0));
+    for (const f of FAMILIES) {
+      newStock[f] = { names: [...names], counts: [...counts] };
+    }
+  } else if (mode === 'custom') {
+    const prizes = body.prizes || {};
+    for (const f of FAMILIES) {
+      if (prizes[f]) {
+        newStock[f] = {
+          names: prizes[f].names || ['Premio tipo 1', 'Premio tipo 2', 'Premio tipo 3'],
+          counts: (prizes[f].counts || [0, 0, 0]).map(c => Math.max(0, parseInt(c, 10) || 0)),
+        };
+      } else {
+        newStock[f] = defaultStockFamily();
+      }
+    }
+  } else {
+    return { ok: false, error: 'mode debe ser "uniform" o "custom"' };
+  }
+
+  const initialStock = {};
+  for (const f of FAMILIES) {
+    initialStock[f] = { names: [...newStock[f].names], counts: [...newStock[f].counts] };
+  }
+
+  await STOCK_DOC.set(newStock);
+  await CONFIG_DOC.update({
+    liveMode: true,
+    initialStock,
+    configuredAt: new Date().toISOString(),
+  });
+
+  return { ok: true, stock: newStock, initialStock };
+}
+
+async function actionAdminResetTestMode(body) {
+  await checkAdminAuth(body);
+  await CONFIG_DOC.update({ liveMode: false, initialStock: null, configuredAt: null });
+  // Reset stock to zeros
+  const emptyStock = {};
+  for (const f of FAMILIES) emptyStock[f] = defaultStockFamily();
+  await STOCK_DOC.set(emptyStock);
+  return { ok: true };
+}
+
+async function actionAdminGetStats(body) {
+  await checkAdminAuth(body);
+  const cfg = await readConfig();
+  const stock = await readStock();
+
+  // Count scans per family + prizeType
+  const scansSnap = await SCANS_COL.get();
+  const stats = {};
+  for (const f of FAMILIES) {
+    stats[f] = { 1: 0, 2: 0, 3: 0 };
+  }
+  scansSnap.forEach(doc => {
+    const d = doc.data();
+    if (d.family && stats[d.family] && d.prizeType) {
+      stats[d.family][d.prizeType] = (stats[d.family][d.prizeType] || 0) + 1;
+    }
+  });
+
+  // Count total tests completed
+  const resultsSnap = await RESULTS_COL.get();
+  const testCount = resultsSnap.size;
+
+  return { ok: true, config: cfg, stock, scanStats: stats, testCount };
+}
+
+/* ───── public: mode check ───── */
+
+async function actionGetMode() {
+  const cfg = await readConfig();
+  return { ok: true, liveMode: !!cfg.liveMode };
 }
 
 /* ───── OTP / sesión de alumnado ───── */
@@ -238,13 +328,8 @@ function generateSessionToken() {
 let mailer = null;
 function getMailer() {
   if (mailer) return mailer;
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    throw new Error('GMAIL_USER o GMAIL_APP_PASSWORD no configurados');
-  }
-  mailer = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
-  });
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) throw new Error('GMAIL_USER o GMAIL_APP_PASSWORD no configurados');
+  mailer = nodemailer.createTransport({ service: 'gmail', auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD } });
   return mailer;
 }
 
@@ -259,9 +344,7 @@ async function sendOtpEmail(toEmail, code) {
         <div style="display:inline-block;background:#2a7d4f;color:#fff;font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;padding:5px 14px;border-radius:20px;margin-bottom:14px">IES Luis Bueno Crespo</div>
         <h2 style="color:#2a7d4f;margin:0 0 8px">Tu código de acceso</h2>
         <p style="color:#555;margin:0 0 16px">Introduce este código en la app del Test de Orientación Profesional para confirmar tu correo:</p>
-        <div style="font-size:38px;font-weight:800;letter-spacing:8px;color:#2a7d4f;padding:16px;background:#e6f4ec;border-radius:12px;text-align:center">
-          ${code}
-        </div>
+        <div style="font-size:38px;font-weight:800;letter-spacing:8px;color:#2a7d4f;padding:16px;background:#e6f4ec;border-radius:12px;text-align:center">${code}</div>
         <p style="color:#6b6b7b;font-size:12px;margin:18px 0 0">El código caduca en 15 minutos. Si no has solicitado este código, ignora este mensaje.</p>
       </div>
     `,
@@ -295,11 +378,7 @@ async function actionRequestOtp(body) {
   }
 
   const code = generateOTP();
-  await ref.set({
-    codeHash: hashOTP(code),
-    attempts: 0,
-    lastSentAt: new Date(),
-  }, { merge: true });
+  await ref.set({ codeHash: hashOTP(code), attempts: 0, lastSentAt: new Date() }, { merge: true });
 
   try {
     await sendOtpEmail(email, code);
@@ -338,14 +417,14 @@ async function actionVerifyOtp(body) {
   }
 
   const sessionToken = generateSessionToken();
-  const sessionExpiresAt = Date.now() + SESSION_TTL_MS;
   await ref.update({
     attempts: 0,
     sessionToken,
-    sessionExpiresAt: new Date(sessionExpiresAt),
+    sessionExpiresAt: new Date(Date.now() + SESSION_TTL_MS),
     verifiedAt: new Date(),
   });
 
+  const cfg = await readConfig();
   const resultSnap = await RESULTS_COL.doc(email).get();
   const result = resultSnap.exists ? resultSnap.data() : null;
 
@@ -355,7 +434,7 @@ async function actionVerifyOtp(body) {
     if (progSnap.exists) progress = progSnap.data();
   }
 
-  return { ok: true, email, sessionToken, result, found: !!result, progress };
+  return { ok: true, email, sessionToken, result, found: !!result, progress, liveMode: !!cfg.liveMode };
 }
 
 async function requireSession(email, sessionToken) {
@@ -363,9 +442,7 @@ async function requireSession(email, sessionToken) {
   const snap = await OTPS_COL.doc(email).get();
   if (!snap.exists) throw new Error('sesión no válida');
   const data = snap.data();
-  if (!data.sessionToken || data.sessionToken !== sessionToken) {
-    throw new Error('sesión no válida');
-  }
+  if (!data.sessionToken || data.sessionToken !== sessionToken) throw new Error('sesión no válida');
   const exp = tsMillis(data.sessionExpiresAt);
   if (!exp || Date.now() > exp) throw new Error('sesión caducada');
 }
@@ -373,11 +450,7 @@ async function requireSession(email, sessionToken) {
 async function actionSaveProgress(body) {
   const email = normalizeEmail(body.email);
   if (!email) return { ok: false, error: 'email obligatorio' };
-  try {
-    await requireSession(email, body.sessionToken);
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
+  try { await requireSession(email, body.sessionToken); } catch (e) { return { ok: false, error: e.message }; }
   await PROGRESS_COL.doc(email).set({
     answers: body.answers || {},
     currentQuestion: parseInt(body.currentQuestion, 10) || 0,
@@ -387,21 +460,16 @@ async function actionSaveProgress(body) {
 }
 
 async function actionSubmitResults(body) {
-  // Requiere OTP verificada (email + sessionToken). Guarda en Firestore
-  // y apila una fila en la Google Sheet (audit/export).
   try {
     const email = normalizeEmail(body.email);
     if (!email) return { ok: false, error: 'email obligatorio' };
-    try {
-      await requireSession(email, body.sessionToken);
-    } catch (e) {
-      return { ok: false, error: e.message };
-    }
+    try { await requireSession(email, body.sessionToken); } catch (e) { return { ok: false, error: e.message }; }
 
+    const cfg = await readConfig();
     const ref = RESULTS_COL.doc(email);
     const snap = await ref.get();
-    if (snap.exists) {
-      // Ya hizo el test: devolvemos lo que había, sin sobrescribir ni reescribir Sheet
+
+    if (snap.exists && cfg.liveMode) {
       return { ok: true, alreadyExists: true, result: snap.data() };
     }
 
@@ -430,12 +498,12 @@ async function actionSubmitResults(body) {
         adaptabilidad: body.adaptabilidad || 0,
         pensamientoCritico: body.pensamientoCritico || 0,
       },
+      liveMode: !!cfg.liveMode,
       timestamp: new Date().toISOString(),
     };
     await ref.set(doc);
     PROGRESS_COL.doc(email).delete().catch(() => {});
 
-    // Audit log en Google Sheet (best-effort, no rompe si falla)
     if (SHEET_ID) {
       appendResultsRow(body, email).catch((e) => console.log('sheet results log error:', e.message));
     }
@@ -447,20 +515,28 @@ async function actionSubmitResults(body) {
 }
 
 async function actionGetMyResults(body) {
-  // Requiere OTP verificada (email + sessionToken). Bootstrap de la app
-  // tras recargar la página.
   const email = normalizeEmail(body.email);
   if (!email) return { ok: false, error: 'email obligatorio' };
-  try {
-    await requireSession(email, body.sessionToken);
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
+  try { await requireSession(email, body.sessionToken); } catch (e) { return { ok: false, error: e.message }; }
+  const cfg = await readConfig();
   const snap = await RESULTS_COL.doc(email).get();
-  if (snap.exists) return { ok: true, found: true, result: snap.data() };
+  if (snap.exists) return { ok: true, found: true, result: snap.data(), liveMode: !!cfg.liveMode };
   const progSnap = await PROGRESS_COL.doc(email).get();
-  return { ok: true, found: false, progress: progSnap.exists ? progSnap.data() : null };
+  return { ok: true, found: false, progress: progSnap.exists ? progSnap.data() : null, liveMode: !!cfg.liveMode };
 }
+
+async function actionRetakeTest(body) {
+  const email = normalizeEmail(body.email);
+  if (!email) return { ok: false, error: 'email obligatorio' };
+  try { await requireSession(email, body.sessionToken); } catch (e) { return { ok: false, error: e.message }; }
+  const cfg = await readConfig();
+  if (cfg.liveMode) return { ok: false, error: 'No se puede repetir el test en modo en vivo.' };
+  await RESULTS_COL.doc(email).delete().catch(() => {});
+  await PROGRESS_COL.doc(email).delete().catch(() => {});
+  return { ok: true };
+}
+
+/* ───── sheets helpers ───── */
 
 async function appendResultsRow(body, email) {
   const sheets = await getSheets();
@@ -499,22 +575,15 @@ async function appendScanLog(body, prizeName) {
     range: 'escaneos!A:F',
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [[
-        new Date().toISOString(),
-        body.code, body.family, body.prizeType, prizeName, body.studentName || '',
-      ]],
+      values: [[new Date().toISOString(), body.code, body.family, body.prizeType, prizeName, body.studentName || '']],
     },
   });
 }
 
-/* ───── google sheets helpers ───── */
-
 let sheetsClient = null;
 async function getSheets() {
   if (sheetsClient) return sheetsClient;
-  const auth = new google.auth.GoogleAuth({
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
+  const auth = new google.auth.GoogleAuth({ scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
   sheetsClient = google.sheets({ version: 'v4', auth });
   return sheetsClient;
 }

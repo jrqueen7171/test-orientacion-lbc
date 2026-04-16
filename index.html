@@ -397,13 +397,16 @@ const PRIZE_TYPES = [1,2,3];
 // Sesión profesor (en memoria; se borra al cerrar sesión o refrescar)
 let teacherPassword = '';
 let cachedStock = null;
+let cachedInitialStock = null;
+let cachedLiveMode = false;
 
 function pickRandomPrizeType(){return PRIZE_TYPES[Math.floor(Math.random()*PRIZE_TYPES.length)]}
 
 // âââââââââââââââââââââââââââââââââââââââââââ
 // STATE
 // âââââââââââââââââââââââââââââââââââââââââââ
-let S={screen:'intro',cq:0,ans:{},email:'',sessionToken:'',prizeCode:'',prizeType:0,familyKey:'',locked:false,teacherFamily:null,otpError:'',otpInfo:''};
+let S={screen:'intro',cq:0,ans:{},email:'',sessionToken:'',prizeCode:'',prizeType:0,familyKey:'',locked:false,teacherFamily:null,otpError:'',otpInfo:'',liveMode:false};
+let adminPassword='';
 const LS_SESSION='lbc_session';
 function saveSession(email,sessionToken){
   try{localStorage.setItem(LS_SESSION,JSON.stringify({email,sessionToken}))}catch(e){}
@@ -515,6 +518,8 @@ function render(){
   else if(S.screen==='results')renderResults();
   else if(S.screen==='teacherLogin')renderTeacherLogin();
   else if(S.screen==='teacher')renderTeacher();
+  else if(S.screen==='adminLogin')renderAdminLogin();
+  else if(S.screen==='admin')renderAdmin();
 }
 
 function renderIntro(){
@@ -537,8 +542,9 @@ function renderIntro(){
       <span class="chip c-textil">🧵 Textil</span>
     </div>
     <button class="btn btn-full" onclick="S.screen='email';render()">Comenzar el test →</button>
-    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
-      <button class="btn btn-outline" onclick="S.screen='teacherLogin';render()" style="font-size:13px">🔐 Acceso Profesor · Lector QR</button>
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="S.screen='teacherLogin';render()" style="font-size:13px;flex:1">🔐 Acceso Profesor</button>
+      <button class="btn btn-dark" onclick="S.screen='adminLogin';render()" style="font-size:13px;flex:1">⚙️ Administrador</button>
     </div>
   </div>
   <p class="footer">⏱ 10-15 min · 38 preguntas · Resultados inmediatos con premio</p>`;
@@ -622,10 +628,11 @@ window.submitOtp=async function(){
   try{
     const data=await apiCall('verifyOtp',{email:S.email,code});
     S.sessionToken=data.sessionToken||'';
+    S.liveMode=!!data.liveMode;
     saveSession(S.email,S.sessionToken);
     if(data.found&&data.result){
       loadResultIntoState(S.email,data.result);
-      S.screen='results';S.locked=true;
+      S.screen='results';S.locked=!!S.liveMode;
       render();window.scrollTo({top:0,behavior:'smooth'});
       return;
     }
@@ -673,7 +680,11 @@ function renderQuiz(){
   const q=QS[S.cq],tot=QS.length,pct=Math.round(S.cq/tot*100);
   const sl=q.section==='soft'?`Soft Skills — ${SSKILLS[q.skill]||''}`:'Aptitudes Técnicas';
   const sel=S.ans[q.id];
+  const modeTag=S.liveMode
+    ?'<div style="text-align:center;padding:8px;background:var(--green-light);border-radius:8px;margin-bottom:10px;font-size:11px;font-weight:700;color:var(--green)">✅ Encuesta validada — No es de prueba</div>'
+    :'<div style="text-align:center;padding:8px;background:var(--amber-light);border-radius:8px;margin-bottom:10px;font-size:11px;font-weight:700;color:var(--amber)">🧪 Modo pruebas</div>';
   app.innerHTML=`
+  ${modeTag}
   <div class="prog-wrap">
     <div class="prog-top"><strong>Pregunta ${S.cq+1} de ${tot}</strong><span>${pct}%</span></div>
     <div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div>
@@ -701,6 +712,14 @@ function renderQuiz(){
 function pick(i){S.ans[QS[S.cq].id]=i;render();debouncedSaveProgress()}
 function next(){if(S.cq<QS.length-1){S.cq++;render();window.scrollTo({top:0,behavior:'smooth'});debouncedSaveProgress()}}
 function prev(){if(S.cq>0){S.cq--;render();window.scrollTo({top:0,behavior:'smooth'})}}
+window.retakeTest=async function(){
+  if(S.liveMode){alert('No se puede repetir el test en modo en vivo.');return}
+  try{
+    await apiCall('retakeTest',{email:S.email,sessionToken:S.sessionToken});
+    S.ans={};S.cq=0;S.locked=false;S.prizeCode='';S.prizeType=0;S.familyKey='';
+    S.screen='quiz';render();window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){alert('Error: '+e.message)}
+};
 window.exitQuiz=async function(){
   if(S.email&&S.sessionToken){
     try{await apiCall('saveProgress',{email:S.email,sessionToken:S.sessionToken,answers:S.ans,currentQuestion:S.cq})}catch(e){}
@@ -746,8 +765,18 @@ function renderResults(){
   const weakAreas=ssEntries.filter(s=>s.total>0&&s.pct<60).slice(0,3);
   const okAreas=ssEntries.filter(s=>s.total>0&&s.pct>=60&&s.pct<75).slice(0,2);
 
+  const modeBanner=S.liveMode
+    ?`<div class="card" style="border:2px solid var(--green);background:var(--green-light);text-align:center;padding:14px">
+        <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--green)">✅ Encuesta validada · Modo en vivo</span>
+      </div>`
+    :`<div class="card" style="border:2px solid var(--amber);background:var(--amber-light);text-align:center;padding:14px">
+        <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber)">🧪 Modo pruebas — Los premios no se reparten</span>
+        <br><button class="btn" style="margin-top:10px;background:var(--amber);font-size:13px;padding:10px 20px" onclick="retakeTest()">🔄 Repetir el test</button>
+      </div>`;
+
   app.innerHTML=`
   <div style="animation:fadeUp .5s ease">
+    ${modeBanner}
     <div class="card res-hero">
       <div class="emo">${w.emoji}</div>
       <h2>${w.nombre}</h2>
@@ -952,6 +981,8 @@ window.teacherLogin=async function(){
     const data=await apiCall('login',{password:pw,family:S.teacherFamily});
     teacherPassword=pw;
     cachedStock=data.stock;
+    cachedInitialStock=data.initialStock||null;
+    cachedLiveMode=!!data.liveMode;
     err.textContent='';
     S.screen='teacher';render();
   }catch(e){
@@ -967,34 +998,38 @@ function renderTeacher(){
   const fk=S.teacherFamily;
   const fam=FAM[fk];
   const fc=(cachedStock&&cachedStock[fk])||{names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'],counts:[0,0,0]};
+  const ini=cachedInitialStock&&cachedInitialStock[fk];
+  const isLive=!!cachedLiveMode;
   app.innerHTML=`
   <div class="hdr">
     <div class="hdr-badge">Panel Docente · ${fam.nombre}</div>
     <h1>${fam.emoji} ${fam.nombre}</h1>
-    <p>Gestión de premios y lector de códigos QR</p>
+    <p>Premios y lector de códigos QR</p>
   </div>
 
+  ${isLive?'':`<div class="card" style="border:2px solid var(--amber);background:var(--amber-light);text-align:center;padding:14px">
+    <span style="font-size:11px;font-weight:700;color:var(--amber)">🧪 MODO PRUEBAS — El administrador aún no ha configurado los premios</span>
+  </div>`}
+
   <div class="card">
-    <h3 style="font-family:'Fraunces',serif;font-size:18px;margin-bottom:4px">🎁 Stock de premios</h3>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Edita el nombre y la cantidad disponible para cada tipo. Los cambios se guardan automáticamente.</p>
-    ${[0,1,2].map(i=>`
+    <h3 style="font-family:'Fraunces',serif;font-size:18px;margin-bottom:4px">🎁 Premios de tu familia</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Stock gestionado por el administrador. Se actualiza en tiempo real al canjear.</p>
+    ${[0,1,2].map(i=>{
+      const total=ini?ini.counts[i]:'-';
+      const remaining=fc.counts[i];
+      const distributed=ini?(ini.counts[i]-remaining):'-';
+      return `
       <div style="padding:14px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:10px;background:var(--bg)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <span style="font-size:10px;font-weight:700;color:var(--green);letter-spacing:1.5px;text-transform:uppercase">Tipo ${i+1}</span>
-          <span style="font-size:24px;font-weight:800;color:var(--${fk});font-family:'Fraunces',serif" id="cnt-${i}">${fc.counts[i]}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--${fk})">${fc.names[i]||'Premio tipo '+(i+1)}</span>
         </div>
-        <input type="text" value="${(fc.names[i]||'').replace(/"/g,'&quot;')}" id="pname-${i}" placeholder="Nombre del premio"
-          style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:7px;font-family:'Outfit';font-size:13px;outline:none;margin-bottom:8px"
-          onchange="updatePrizeName(${i},this.value)"
-          onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'">
-        <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-outline" style="padding:7px 12px;font-size:13px" onclick="adjustCount(${i},-1)">−</button>
-          <input type="number" value="${fc.counts[i]}" id="pcnt-${i}" min="0"
-            style="flex:1;padding:7px;border:1.5px solid var(--border);border-radius:7px;font-family:'Outfit';font-size:14px;text-align:center;outline:none"
-            onchange="setCount(${i},this.value)">
-          <button class="btn btn-outline" style="padding:7px 12px;font-size:13px" onclick="adjustCount(${i},1)">+</button>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);gap:8px">
+          <span>Total: <strong style="color:var(--text)">${total}</strong></span>
+          <span>Repartidos: <strong style="color:var(--amber)">${distributed}</strong></span>
+          <span>Restantes: <strong style="color:var(--green);font-size:18px" id="cnt-${i}">${remaining}</strong></span>
         </div>
-      </div>`).join('')}
+      </div>`}).join('')}
     <p style="font-size:11px;color:var(--muted);margin-top:4px">Total restante: <strong id="totalCount">${fc.counts.reduce((a,b)=>a+b,0)}</strong> premios</p>
   </div>
 
@@ -1026,45 +1061,21 @@ function renderTeacher(){
 
 window.teacherLogout=function(){stopCamera();teacherPassword='';cachedStock=null;S.teacherFamily=null;S.screen='intro';render()};
 
-async function syncStock(updateArgs){
-  const body=Object.assign({password:teacherPassword,family:S.teacherFamily},updateArgs||{});
-  const action=updateArgs?'updatePrize':'getStock';
+async function syncStock(){
   try{
-    const data=await apiCall(action,body);
+    const data=await apiCall('getStock',{password:teacherPassword});
     if(data.stock){cachedStock=data.stock;refreshCounters()}
+    if(data.initialStock)cachedInitialStock=data.initialStock;
+    if(data.liveMode!==undefined)cachedLiveMode=!!data.liveMode;
   }catch(e){
     const st=$('scanStatus');if(st)st.textContent='⚠️ Error de conexión: '+e.message;
   }
 }
 
-window.updatePrizeName=function(idx,val){
-  const n=val.trim()||('Premio tipo '+(idx+1));
-  if(cachedStock&&cachedStock[S.teacherFamily])cachedStock[S.teacherFamily].names[idx]=n;
-  syncStock({index:idx,name:n});
-};
-
-window.setCount=function(idx,val){
-  const n=Math.max(0,parseInt(val,10)||0);
-  if(cachedStock&&cachedStock[S.teacherFamily])cachedStock[S.teacherFamily].counts[idx]=n;
-  refreshCounters();
-  syncStock({index:idx,count:n});
-};
-
-window.adjustCount=function(idx,delta){
-  const fc=cachedStock&&cachedStock[S.teacherFamily];
-  if(!fc)return;
-  const n=Math.max(0,(fc.counts[idx]||0)+delta);
-  fc.counts[idx]=n;
-  refreshCounters();
-  syncStock({index:idx,count:n});
-};
-
 function refreshCounters(){
   const fc=cachedStock&&cachedStock[S.teacherFamily];if(!fc)return;
   [0,1,2].forEach(i=>{
     const el=$('cnt-'+i);if(el)el.textContent=fc.counts[i];
-    const inp=$('pcnt-'+i);if(inp&&document.activeElement!==inp)inp.value=fc.counts[i];
-    const nm=$('pname-'+i);if(nm&&document.activeElement!==nm)nm.value=fc.names[i]||'';
   });
   const tot=$('totalCount');if(tot)tot.textContent=fc.counts.reduce((a,b)=>a+b,0);
 }
@@ -1200,16 +1211,263 @@ window.manualLookup=function(){
   </div>`;
 };
 
+// ═════════════════════════════════════════
+// ADMIN
+// ═════════════════════════════════════════
+function renderAdminLogin(){
+  app.innerHTML=`
+  <div class="hdr">
+    <div class="hdr-badge">Administración</div>
+    <h1>⚙️ Panel de Administrador</h1>
+    <p>Gestión de contraseñas, premios y estadísticas.</p>
+  </div>
+  <div class="card">
+    <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Contraseña de administrador</label>
+    <input id="adminPass" type="password" placeholder="••••••••"
+      style="width:100%;padding:13px;border:2px solid var(--border);border-radius:10px;font-family:'Outfit';font-size:16px;outline:none;margin-bottom:14px"
+      onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'"
+      onkeypress="if(event.key==='Enter')adminLoginFn()">
+    <p id="adminErr" style="color:var(--red);font-size:13px;margin-bottom:10px;min-height:18px"></p>
+    <button class="btn btn-dark" onclick="adminLoginFn()" style="width:100%">Entrar →</button>
+    <button class="btn btn-outline" style="width:100%;margin-top:8px" onclick="S.screen='intro';render()">← Volver</button>
+  </div>`;
+  setTimeout(()=>{const i=$('adminPass');if(i)i.focus()},100);
+}
+
+let adminConfig=null,adminStock=null;
+window.adminLoginFn=async function(){
+  const pw=($('adminPass')||{}).value||'';
+  const err=$('adminErr');
+  if(!pw){err.textContent='Introduce la contraseña.';return}
+  err.textContent='Conectando…';
+  try{
+    const data=await apiCall('adminLogin',{adminPassword:pw});
+    adminPassword=pw;adminConfig=data.config;adminStock=data.stock;
+    S.screen='admin';render();
+  }catch(e){
+    err.textContent=e.message==='unauthorized'?'Contraseña incorrecta.':('Error: '+e.message);
+  }
+};
+
+function renderAdmin(){
+  const cfg=adminConfig||{};
+  const stock=adminStock||{};
+  const isLive=!!cfg.liveMode;
+
+  app.innerHTML=`
+  <div class="hdr">
+    <div class="hdr-badge">Administración</div>
+    <h1>⚙️ Panel de Administrador</h1>
+  </div>
+
+  <div class="card" style="border:2px solid ${isLive?'var(--green)':'var(--amber)'};text-align:center;padding:16px">
+    <span style="font-size:20px">${isLive?'✅':'🧪'}</span>
+    <div style="font-size:14px;font-weight:800;margin:4px 0;color:${isLive?'var(--green)':'var(--amber)'}">${isLive?'MODO EN VIVO':'MODO PRUEBAS'}</div>
+    <p style="font-size:11px;color:var(--muted)">${isLive?'Los premios están configurados. Los alumnos solo pueden hacer el test una vez.':'Los alumnos pueden repetir el test. No se reparten premios.'}</p>
+    ${isLive?`<button class="btn btn-outline" style="margin-top:10px;font-size:12px;padding:8px 16px;border-color:var(--red);color:var(--red)" onclick="adminResetTestMode()">🧪 Volver a modo pruebas</button>`:''}
+  </div>
+
+  <div class="card">
+    <h3 style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:10px">🔑 Contraseñas</h3>
+    <div style="margin-bottom:14px">
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Contraseña del profesorado</label>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <input id="newTeacherPw" type="text" value="${(cfg.teacherPassword||'').replace(/"/g,'&quot;')}"
+          style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Outfit';font-size:14px;outline:none">
+        <button class="btn" style="padding:10px 14px;font-size:12px" onclick="adminChangeTeacherPw()">Guardar</button>
+      </div>
+    </div>
+    <div>
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Contraseña del administrador</label>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <input id="newAdminPw" type="text" value="${(cfg.adminPassword||'').replace(/"/g,'&quot;')}"
+          style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Outfit';font-size:14px;outline:none">
+        <button class="btn btn-dark" style="padding:10px 14px;font-size:12px" onclick="adminChangeAdminPw()">Guardar</button>
+      </div>
+    </div>
+    <p id="pwMsg" style="font-size:12px;margin-top:8px;min-height:16px"></p>
+  </div>
+
+  <div class="card">
+    <h3 style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:6px">🎁 Configurar premios</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Al guardar se activa el <strong>modo en vivo</strong>. Los alumnos no podrán repetir el test.</p>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn btn-outline" id="modeUniform" onclick="setPrizeMode('uniform')" style="flex:1;font-size:12px;padding:10px">Igual para todas</button>
+      <button class="btn btn-outline" id="modeCustom" onclick="setPrizeMode('custom')" style="flex:1;font-size:12px;padding:10px">Personalizado</button>
+    </div>
+    <div id="prizeConfig"></div>
+    <button class="btn btn-full" style="margin-top:14px" onclick="adminSavePrizes()" id="savePrizesBtn">💾 Guardar premios y activar modo en vivo</button>
+    <p id="prizeMsg" style="font-size:12px;margin-top:8px;min-height:16px"></p>
+  </div>
+
+  <div class="card" id="statsCard">
+    <h3 style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:6px">📈 Estadísticas</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Cargando…</p>
+  </div>
+
+  <button class="btn btn-outline" style="width:100%" onclick="adminPassword='';adminConfig=null;adminStock=null;S.screen='intro';render()">🚪 Cerrar sesión</button>
+  <p class="footer">IES Luis Bueno Crespo · Administración</p>`;
+
+  setPrizeMode('uniform');
+  loadAdminStats();
+}
+
+let currentPrizeMode='uniform';
+function setPrizeMode(mode){
+  currentPrizeMode=mode;
+  const uBtn=$('modeUniform'),cBtn=$('modeCustom');
+  if(uBtn)uBtn.style.background=mode==='uniform'?'var(--green-light)':'';
+  if(uBtn)uBtn.style.borderColor=mode==='uniform'?'var(--green)':'';
+  if(cBtn)cBtn.style.background=mode==='custom'?'var(--green-light)':'';
+  if(cBtn)cBtn.style.borderColor=mode==='custom'?'var(--green)':'';
+
+  const cfg=adminConfig||{};
+  const ini=cfg.initialStock||{};
+  const div=$('prizeConfig');if(!div)return;
+
+  if(mode==='uniform'){
+    const ref=ini[FAMILIES[0]]||{names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'],counts:[10,5,2]};
+    div.innerHTML=[0,1,2].map(i=>`
+      <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
+        <span style="font-size:11px;font-weight:700;color:var(--green);width:50px">Tipo ${i+1}</span>
+        <input id="uName${i}" type="text" value="${(ref.names[i]||'').replace(/"/g,'&quot;')}" placeholder="Nombre"
+          style="flex:2;padding:8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Outfit';font-size:13px;outline:none">
+        <input id="uCount${i}" type="number" value="${ref.counts[i]||0}" min="0"
+          style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:7px;font-family:'Outfit';font-size:13px;text-align:center;outline:none">
+      </div>`).join('');
+  }else{
+    const FKEYS=Object.keys(FAM);
+    div.innerHTML=FKEYS.map(fk=>{
+      const f=FAM[fk];
+      const ref=ini[fk]||{names:['Premio tipo 1','Premio tipo 2','Premio tipo 3'],counts:[10,5,2]};
+      return `
+      <div style="margin-bottom:14px;padding:12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg)">
+        <div style="font-size:12px;font-weight:700;color:var(--${fk});margin-bottom:8px">${f.emoji} ${f.nombre}</div>
+        ${[0,1,2].map(i=>`
+          <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+            <span style="font-size:10px;width:40px;color:var(--muted)">T${i+1}</span>
+            <input id="c_${fk}_n${i}" type="text" value="${(ref.names[i]||'').replace(/"/g,'&quot;')}" placeholder="Nombre"
+              style="flex:2;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none">
+            <input id="c_${fk}_c${i}" type="number" value="${ref.counts[i]||0}" min="0"
+              style="flex:1;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:center;outline:none">
+          </div>`).join('')}
+      </div>`;
+    }).join('');
+  }
+}
+
+window.adminSavePrizes=async function(){
+  const msg=$('prizeMsg');
+  const btn=$('savePrizesBtn');
+  if(btn){btn.disabled=true;btn.textContent='Guardando…'}
+  let body={adminPassword,mode:currentPrizeMode};
+  if(currentPrizeMode==='uniform'){
+    body.names=[0,1,2].map(i=>($('uName'+i)||{}).value||'Premio tipo '+(i+1));
+    body.counts=[0,1,2].map(i=>parseInt(($('uCount'+i)||{}).value,10)||0);
+  }else{
+    const prizes={};
+    Object.keys(FAM).forEach(fk=>{
+      prizes[fk]={
+        names:[0,1,2].map(i=>($('c_'+fk+'_n'+i)||{}).value||'Premio tipo '+(i+1)),
+        counts:[0,1,2].map(i=>parseInt(($('c_'+fk+'_c'+i)||{}).value,10)||0),
+      };
+    });
+    body.prizes=prizes;
+  }
+  try{
+    const data=await apiCall('adminSetPrizes',body);
+    adminStock=data.stock;
+    adminConfig=adminConfig||{};
+    adminConfig.liveMode=true;
+    adminConfig.initialStock=data.initialStock;
+    if(msg){msg.style.color='var(--green)';msg.textContent='✅ Premios guardados. Modo en vivo activado.'}
+    setTimeout(()=>{S.screen='admin';render()},1200);
+  }catch(e){
+    if(msg){msg.style.color='var(--red)';msg.textContent='Error: '+e.message}
+    if(btn){btn.disabled=false;btn.textContent='💾 Guardar premios y activar modo en vivo'}
+  }
+};
+
+window.adminResetTestMode=async function(){
+  if(!confirm('¿Volver a modo pruebas? Se reiniciará el stock de premios a 0.'))return;
+  try{
+    await apiCall('adminResetTestMode',{adminPassword});
+    adminConfig.liveMode=false;adminConfig.initialStock=null;
+    S.screen='admin';render();
+  }catch(e){alert('Error: '+e.message)}
+};
+
+window.adminChangeTeacherPw=async function(){
+  const np=($('newTeacherPw')||{}).value||'';
+  const msg=$('pwMsg');
+  try{
+    await apiCall('adminSetTeacherPassword',{adminPassword,newPassword:np});
+    adminConfig.teacherPassword=np;
+    if(msg){msg.style.color='var(--green)';msg.textContent='✅ Contraseña del profesorado actualizada.'}
+  }catch(e){if(msg){msg.style.color='var(--red)';msg.textContent=e.message}}
+};
+
+window.adminChangeAdminPw=async function(){
+  const np=($('newAdminPw')||{}).value||'';
+  const msg=$('pwMsg');
+  try{
+    await apiCall('adminSetAdminPassword',{adminPassword,newPassword:np});
+    adminPassword=np;adminConfig.adminPassword=np;
+    if(msg){msg.style.color='var(--green)';msg.textContent='✅ Contraseña de administrador actualizada.'}
+  }catch(e){if(msg){msg.style.color='var(--red)';msg.textContent=e.message}}
+};
+
+async function loadAdminStats(){
+  const card=$('statsCard');if(!card)return;
+  try{
+    const data=await apiCall('adminGetStats',{adminPassword});
+    const stats=data.scanStats||{};
+    const cfg=data.config||{};
+    const stock=data.stock||{};
+    const ini=cfg.initialStock||{};
+    const FKEYS=Object.keys(FAM);
+    let html=`<h3 style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:10px">📈 Estadísticas</h3>`;
+    html+=`<p style="font-size:13px;margin-bottom:14px"><strong>${data.testCount||0}</strong> tests completados en total</p>`;
+    html+=`<table style="width:100%;font-size:12px;border-collapse:collapse">
+      <tr style="background:var(--green);color:#fff"><th style="padding:6px;text-align:left;border-radius:6px 0 0 0">Familia</th><th style="padding:6px">Tipo</th><th style="padding:6px">Total</th><th style="padding:6px">Repartidos</th><th style="padding:6px;border-radius:0 6px 0 0">Restantes</th></tr>`;
+    FKEYS.forEach(fk=>{
+      const f=FAM[fk];
+      [1,2,3].forEach((pt,pi)=>{
+        const total=ini[fk]?ini[fk].counts[pi]:'-';
+        const remaining=stock[fk]?stock[fk].counts[pi]:0;
+        const distributed=stats[fk]?stats[fk][pt]:0;
+        const name=stock[fk]?stock[fk].names[pi]:'';
+        html+=`<tr style="border-bottom:1px solid var(--border)${pi===0?';border-top:2px solid var(--border)':''}">
+          <td style="padding:5px;font-weight:${pi===0?'600':'400'}">${pi===0?(f.emoji+' '+f.nombre):''}</td>
+          <td style="padding:5px;text-align:center;color:var(--muted)">${name||'T'+pt}</td>
+          <td style="padding:5px;text-align:center">${total}</td>
+          <td style="padding:5px;text-align:center;color:var(--amber);font-weight:600">${distributed}</td>
+          <td style="padding:5px;text-align:center;color:var(--green);font-weight:600">${remaining}</td>
+        </tr>`;
+      });
+    });
+    html+=`</table>`;
+    card.innerHTML=html;
+  }catch(e){
+    card.innerHTML=`<p style="color:var(--red)">Error cargando estadísticas: ${e.message}</p>`;
+  }
+}
+
+const FKEYS_FOR_ADMIN=Object.keys(FAM);
+
 async function bootstrap(){
-  render(); // pinta la intro mientras resolvemos
+  render();
+  // Fetch live mode status
+  if(BACKEND_URL){try{const m=await apiCall('getMode',{});S.liveMode=!!m.liveMode}catch(e){}}
   const sess=loadSession();
   if(!sess||!BACKEND_URL)return;
   try{
     const data=await apiCall('getMyResults',{email:sess.email,sessionToken:sess.sessionToken});
     S.email=sess.email;S.sessionToken=sess.sessionToken;
+    if(data.liveMode!==undefined)S.liveMode=!!data.liveMode;
     if(data.found){
       loadResultIntoState(sess.email,data.result);
-      S.screen='results';S.locked=true;
+      S.screen='results';S.locked=!!S.liveMode;
       render();
     }else if(data.progress){
       loadProgressIntoState(data.progress);
@@ -1217,7 +1475,6 @@ async function bootstrap(){
       S.screen='quiz';render();
     }
   }catch(e){
-    // Sesión caducada o inválida: limpiamos y volvemos a la intro
     clearSession();
   }
 }
