@@ -2,8 +2,11 @@
 // - Firestore para el stock de premios y los códigos canjeados (atómico vía runTransaction)
 // - Google Sheets para el log de escaneos y los resultados del test
 // - Contraseña del profesor en Secret Manager (env var TEACHER_PASSWORD)
+// - OTP por email (nodemailer + Gmail) para validar el correo del alumnado
 
 const express = require('express');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const { Firestore } = require('@google-cloud/firestore');
 const { google } = require('googleapis');
 
@@ -12,11 +15,19 @@ const PRIZE_TYPES = [1, 2, 3];
 
 const TEACHER_PASSWORD = process.env.TEACHER_PASSWORD || '';
 const SHEET_ID = process.env.SHEET_ID || '';
+const GMAIL_USER = process.env.GMAIL_USER || '';
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';
+
+const OTP_EXPIRY_MS = 15 * 60 * 1000;          // código válido 15 min
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;      // 1 reenvío cada 60 s
+const OTP_MAX_ATTEMPTS = 5;
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // sesión 7 días
 
 const db = new Firestore();
 const STOCK_DOC = db.collection('lbc_orientacion').doc('stock');
 const SCANS_COL = db.collection('lbc_orientacion_scans');
 const RESULTS_COL = db.collection('lbc_orientacion_results');
+const OTPS_COL = db.collection('lbc_orientacion_otps');
 
 function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase();
@@ -52,6 +63,8 @@ app.post(['/', '/api'], async (req, res) => {
       case 'getStock':      result = await actionGetStock(body); break;
       case 'updatePrize':   result = await actionUpdatePrize(body); break;
       case 'redeem':        result = await actionRedeem(body); break;
+      case 'requestOtp':    result = await actionRequestOtp(body); break;
+      case 'verifyOtp':     result = await actionVerifyOtp(body); break;
       case 'submitResults': result = await actionSubmitResults(body); break;
       case 'getMyResults':  result = await actionGetMyResults(body); break;
       default:              result = { ok: false, error: 'accion desconocida: ' + action };
@@ -206,12 +219,160 @@ async function actionRedeem(body) {
   return { ok: true, ...result };
 }
 
+/* ───── OTP / sesión de alumnado ───── */
+
+function hashOTP(code) {
+  return crypto.createHash('sha256').update(String(code)).digest('hex');
+}
+
+function generateOTP() {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+function generateSessionToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+let mailer = null;
+function getMailer() {
+  if (mailer) return mailer;
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    throw new Error('GMAIL_USER o GMAIL_APP_PASSWORD no configurados');
+  }
+  mailer = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+  });
+  return mailer;
+}
+
+async function sendOtpEmail(toEmail, code) {
+  const m = getMailer();
+  await m.sendMail({
+    from: `"IES Luis Bueno Crespo" <${GMAIL_USER}>`,
+    to: toEmail,
+    subject: 'Tu código de acceso — Test de Orientación',
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:440px;margin:0 auto;padding:24px;color:#1b1b1f">
+        <div style="display:inline-block;background:#2a7d4f;color:#fff;font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;padding:5px 14px;border-radius:20px;margin-bottom:14px">IES Luis Bueno Crespo</div>
+        <h2 style="color:#2a7d4f;margin:0 0 8px">Tu código de acceso</h2>
+        <p style="color:#555;margin:0 0 16px">Introduce este código en la app del Test de Orientación Profesional para confirmar tu correo:</p>
+        <div style="font-size:38px;font-weight:800;letter-spacing:8px;color:#2a7d4f;padding:16px;background:#e6f4ec;border-radius:12px;text-align:center">
+          ${code}
+        </div>
+        <p style="color:#6b6b7b;font-size:12px;margin:18px 0 0">El código caduca en 15 minutos. Si no has solicitado este código, ignora este mensaje.</p>
+      </div>
+    `,
+  });
+}
+
+function tsMillis(v) {
+  if (!v) return 0;
+  if (typeof v.toMillis === 'function') return v.toMillis();
+  if (typeof v.getTime === 'function') return v.getTime();
+  return 0;
+}
+
+async function actionRequestOtp(body) {
+  const email = normalizeEmail(body.email);
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: 'correo electrónico no válido' };
+  }
+
+  const ref = OTPS_COL.doc(email);
+  const snap = await ref.get();
+  const now = Date.now();
+
+  if (snap.exists) {
+    const lastSent = tsMillis(snap.data().lastSentAt);
+    const elapsed = now - lastSent;
+    if (lastSent && elapsed < OTP_RESEND_COOLDOWN_MS) {
+      const wait = Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000);
+      return { ok: false, error: `Espera ${wait} s antes de reenviar el código.` };
+    }
+  }
+
+  const code = generateOTP();
+  await ref.set({
+    codeHash: hashOTP(code),
+    attempts: 0,
+    lastSentAt: new Date(),
+  }, { merge: true });
+
+  try {
+    await sendOtpEmail(email, code);
+  } catch (e) {
+    console.log('sendOtpEmail error:', e.message);
+    return { ok: false, error: 'No se pudo enviar el correo. Revisa la dirección e inténtalo de nuevo.' };
+  }
+
+  return { ok: true };
+}
+
+async function actionVerifyOtp(body) {
+  const email = normalizeEmail(body.email);
+  const code = String(body.code || '').trim();
+  if (!email || !code) return { ok: false, error: 'email y código requeridos' };
+
+  const ref = OTPS_COL.doc(email);
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, error: 'Código no encontrado. Solicita uno nuevo.' };
+
+  const data = snap.data();
+  const lastSent = tsMillis(data.lastSentAt);
+  if (!lastSent || Date.now() - lastSent > OTP_EXPIRY_MS) {
+    return { ok: false, error: 'El código ha caducado. Solicita uno nuevo.' };
+  }
+
+  const attempts = data.attempts || 0;
+  if (attempts >= OTP_MAX_ATTEMPTS) {
+    return { ok: false, error: 'Demasiados intentos. Solicita un código nuevo.' };
+  }
+
+  if (hashOTP(code) !== data.codeHash) {
+    await ref.update({ attempts: attempts + 1 });
+    const remaining = OTP_MAX_ATTEMPTS - attempts - 1;
+    return { ok: false, error: `Código incorrecto. ${remaining} intento${remaining !== 1 ? 's' : ''} restante${remaining !== 1 ? 's' : ''}.` };
+  }
+
+  const sessionToken = generateSessionToken();
+  const sessionExpiresAt = Date.now() + SESSION_TTL_MS;
+  await ref.update({
+    attempts: 0,
+    sessionToken,
+    sessionExpiresAt: new Date(sessionExpiresAt),
+    verifiedAt: new Date(),
+  });
+
+  const resultSnap = await RESULTS_COL.doc(email).get();
+  const result = resultSnap.exists ? resultSnap.data() : null;
+
+  return { ok: true, email, sessionToken, result, found: !!result };
+}
+
+async function requireSession(email, sessionToken) {
+  if (!email || !sessionToken) throw new Error('sesión no válida');
+  const snap = await OTPS_COL.doc(email).get();
+  if (!snap.exists) throw new Error('sesión no válida');
+  const data = snap.data();
+  if (!data.sessionToken || data.sessionToken !== sessionToken) {
+    throw new Error('sesión no válida');
+  }
+  const exp = tsMillis(data.sessionExpiresAt);
+  if (!exp || Date.now() > exp) throw new Error('sesión caducada');
+}
+
 async function actionSubmitResults(body) {
-  // Endpoint público. Guarda en Firestore (para bloquear retakes y permitir
-  // re-abrir resultados) y apila una fila en la Google Sheet (audit/export).
+  // Requiere OTP verificada (email + sessionToken). Guarda en Firestore
+  // y apila una fila en la Google Sheet (audit/export).
   try {
     const email = normalizeEmail(body.email);
     if (!email) return { ok: false, error: 'email obligatorio' };
+    try {
+      await requireSession(email, body.sessionToken);
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
 
     const ref = RESULTS_COL.doc(email);
     const snap = await ref.get();
@@ -261,9 +422,15 @@ async function actionSubmitResults(body) {
 }
 
 async function actionGetMyResults(body) {
-  // Endpoint público. Lookup por email, sin contraseña — contexto escolar.
+  // Requiere OTP verificada (email + sessionToken). Bootstrap de la app
+  // tras recargar la página.
   const email = normalizeEmail(body.email);
   if (!email) return { ok: false, error: 'email obligatorio' };
+  try {
+    await requireSession(email, body.sessionToken);
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
   const snap = await RESULTS_COL.doc(email).get();
   if (!snap.exists) return { ok: true, found: false };
   return { ok: true, found: true, result: snap.data() };

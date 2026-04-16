@@ -26,6 +26,10 @@ SERVICE="${SERVICE:-lbc-orientacion}"
 SECRET_NAME="${SECRET_NAME:-lbc-teacher-password}"
 TEACHER_PASSWORD_DEFAULT="profesor26"
 
+# Gmail para el envío de códigos OTP a los alumnos (reutiliza la infra Klasvid)
+GMAIL_USER="${GMAIL_USER:-jrqueen71@gmail.com}"
+GMAIL_SECRET_NAME="${GMAIL_SECRET_NAME:-GMAIL_APP_PASSWORD}"
+
 if [[ -z "${PROJECT_ID:-}" ]]; then
   echo "❌ PROJECT_ID vacío. Ejecuta: gcloud config set project <klasvid-project-id>" >&2
   exit 1
@@ -74,6 +78,17 @@ gcloud secrets add-iam-policy-binding "$SECRET_NAME" \
   --role="roles/secretmanager.secretAccessor" \
   --quiet >/dev/null
 
+# Acceso al secreto compartido GMAIL_APP_PASSWORD (Klasvid)
+if gcloud secrets describe "$GMAIL_SECRET_NAME" --project="$PROJECT_ID" >/dev/null 2>&1; then
+  gcloud secrets add-iam-policy-binding "$GMAIL_SECRET_NAME" \
+    --project="$PROJECT_ID" \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/secretmanager.secretAccessor" \
+    --quiet >/dev/null
+else
+  echo "⚠️  Secret $GMAIL_SECRET_NAME no existe en $PROJECT_ID. Los OTPs por email fallarán." >&2
+fi
+
 # 4. Deploy desde fuente (Cloud Build crea la imagen a partir del Dockerfile)
 echo "→ Desplegando en Cloud Run..."
 gcloud run deploy "$SERVICE" \
@@ -82,8 +97,8 @@ gcloud run deploy "$SERVICE" \
   --region="$REGION" \
   --allow-unauthenticated \
   --service-account="$SA_EMAIL" \
-  --set-env-vars="SHEET_ID=${SHEET_ID}" \
-  --set-secrets="TEACHER_PASSWORD=${SECRET_NAME}:latest" \
+  --set-env-vars="SHEET_ID=${SHEET_ID},GMAIL_USER=${GMAIL_USER}" \
+  --set-secrets="TEACHER_PASSWORD=${SECRET_NAME}:latest,GMAIL_APP_PASSWORD=${GMAIL_SECRET_NAME}:latest" \
   --min-instances=0 \
   --max-instances=5 \
   --memory=256Mi \

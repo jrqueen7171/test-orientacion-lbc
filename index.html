@@ -463,8 +463,15 @@ function pickRandomPrizeType(){return PRIZE_TYPES[Math.floor(Math.random()*PRIZE
 // âââââââââââââââââââââââââââââââââââââââââââ
 // STATE
 // âââââââââââââââââââââââââââââââââââââââââââ
-let S={screen:'intro',cq:0,ans:{},email:'',prizeCode:'',prizeType:0,familyKey:'',locked:false,teacherFamily:null};
-const LS_EMAIL='lbc_email';
+let S={screen:'intro',cq:0,ans:{},email:'',sessionToken:'',prizeCode:'',prizeType:0,familyKey:'',locked:false,teacherFamily:null,otpError:'',otpInfo:''};
+const LS_SESSION='lbc_session';
+function saveSession(email,sessionToken){
+  try{localStorage.setItem(LS_SESSION,JSON.stringify({email,sessionToken}))}catch(e){}
+}
+function loadSession(){
+  try{const raw=localStorage.getItem(LS_SESSION);if(!raw)return null;const p=JSON.parse(raw);return(p&&p.email&&p.sessionToken)?p:null}catch(e){return null}
+}
+function clearSession(){try{localStorage.removeItem(LS_SESSION)}catch(e){}}
 const $=id=>document.getElementById(id);
 const app=document.getElementById('app');
 
@@ -512,6 +519,7 @@ async function enviarResultados(){
 
   const payload={
     email:S.email,
+    sessionToken:S.sessionToken,
     answers:S.ans,
     codigoPremio:S.prizeCode,tipoPremio:S.prizeType,
     familyKey:S.familyKey,
@@ -544,6 +552,7 @@ async function enviarResultados(){
 function render(){
   if(S.screen==='intro')renderIntro();
   else if(S.screen==='email')renderEmail();
+  else if(S.screen==='otp')renderOtp();
   else if(S.screen==='quiz')renderQuiz();
   else if(S.screen==='results')renderResults();
   else if(S.screen==='teacherLogin')renderTeacherLogin();
@@ -609,24 +618,80 @@ window.submitEmail=async function(){
   const email=(i?i.value:'').trim().toLowerCase();
   if(!validEmail(email)){err.textContent='Introduce un correo electrónico válido.';return}
   err.textContent='';
-  if(btn){btn.disabled=true;btn.textContent='Comprobando…'}
+  if(btn){btn.disabled=true;btn.textContent='Enviando código…'}
   try{
-    const data=await apiCall('getMyResults',{email});
-    if(data.found){
-      loadResultIntoState(email,data.result);
-      try{localStorage.setItem(LS_EMAIL,email)}catch(e){}
+    await apiCall('requestOtp',{email});
+    S.email=email;S.otpError='';S.otpInfo='Hemos enviado un código de 6 dígitos a '+email+'. Revisa tu bandeja (y la carpeta de spam).';
+    S.screen='otp';render();window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){
+    err.textContent=e.message||'Error de conexión';
+    if(btn){btn.disabled=false;btn.textContent='Continuar →'}
+  }
+};
+
+function renderOtp(){
+  app.innerHTML=`
+  <div class="hdr">
+    <h1>Verifica tu correo</h1>
+    <p>${S.otpInfo||''}</p>
+  </div>
+  <div class="card">
+    <label for="otpInput" style="display:block;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Código de 6 dígitos</label>
+    <input id="otpInput" type="tel" inputmode="numeric" autocomplete="one-time-code"
+      maxlength="6" pattern="[0-9]{6}"
+      placeholder="000000"
+      style="width:100%;padding:16px;border:2px solid var(--border);border-radius:10px;font-family:'Fraunces',serif;font-size:28px;font-weight:800;letter-spacing:8px;text-align:center;color:var(--green);outline:none;-webkit-appearance:none"
+      onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'"
+      oninput="this.value=this.value.replace(/\\D/g,'').slice(0,6)"
+      onkeypress="if(event.key==='Enter')submitOtp()">
+    <p id="otpErr" style="color:var(--red);font-size:13px;margin-top:8px;min-height:18px">${S.otpError||''}</p>
+    <button id="otpBtn" class="btn btn-full" style="margin-top:6px" onclick="submitOtp()">Verificar y continuar →</button>
+    <button class="btn btn-outline btn-full" style="margin-top:8px" onclick="resendOtp()" id="otpResend">Reenviar código</button>
+    <button class="btn btn-outline btn-full" style="margin-top:8px" onclick="S.screen='email';S.otpError='';S.otpInfo='';render()">← Usar otro correo</button>
+  </div>
+  <p class="footer">🔒 Validamos tu correo para que solo tú puedas ver y canjear tus resultados.</p>`;
+  setTimeout(()=>{const i=$('otpInput');if(i)i.focus()},100);
+}
+
+window.submitOtp=async function(){
+  const i=$('otpInput');
+  const err=$('otpErr');
+  const btn=$('otpBtn');
+  const code=(i?i.value:'').trim();
+  if(!/^\d{6}$/.test(code)){err.textContent='Introduce el código de 6 dígitos.';return}
+  err.textContent='';
+  if(btn){btn.disabled=true;btn.textContent='Verificando…'}
+  try{
+    const data=await apiCall('verifyOtp',{email:S.email,code});
+    S.sessionToken=data.sessionToken||'';
+    saveSession(S.email,S.sessionToken);
+    if(data.found&&data.result){
+      loadResultIntoState(S.email,data.result);
       S.screen='results';S.locked=true;
       render();window.scrollTo({top:0,behavior:'smooth'});
       return;
     }
-    // No existe → empezar test
-    S.email=email;S.ans={};S.cq=0;S.locked=false;
+    S.ans={};S.cq=0;S.locked=false;
     S.prizeCode='';S.prizeType=0;S.familyKey='';
-    try{localStorage.setItem(LS_EMAIL,email)}catch(e){}
-    S.screen='quiz';render();
+    S.screen='quiz';render();window.scrollTo({top:0,behavior:'smooth'});
   }catch(e){
-    err.textContent='Error de conexión: '+e.message;
-    if(btn){btn.disabled=false;btn.textContent='Continuar →'}
+    S.otpError=e.message||'Código incorrecto';
+    if(err)err.textContent=S.otpError;
+    if(btn){btn.disabled=false;btn.textContent='Verificar y continuar →'}
+  }
+};
+
+window.resendOtp=async function(){
+  const btn=$('otpResend');
+  const err=$('otpErr');
+  if(btn){btn.disabled=true;btn.textContent='Enviando…'}
+  try{
+    await apiCall('requestOtp',{email:S.email});
+    if(err){err.style.color='var(--green)';err.textContent='Código reenviado. Revisa tu correo.'}
+    if(btn){btn.disabled=false;btn.textContent='Reenviar código'}
+  }catch(e){
+    if(err){err.style.color='var(--red)';err.textContent=e.message||'No se pudo reenviar.'}
+    if(btn){btn.disabled=false;btn.textContent='Reenviar código'}
   }
 };
 
@@ -639,8 +704,9 @@ function loadResultIntoState(email,r){
 }
 
 window.logoutStudent=function(){
-  try{localStorage.removeItem(LS_EMAIL)}catch(e){}
-  S.email='';S.ans={};S.cq=0;S.prizeCode='';S.prizeType=0;S.familyKey='';S.locked=false;
+  clearSession();
+  S.email='';S.sessionToken='';S.ans={};S.cq=0;S.prizeCode='';S.prizeType=0;S.familyKey='';S.locked=false;
+  S.otpError='';S.otpInfo='';
   S.screen='intro';render();window.scrollTo({top:0,behavior:'smooth'});
 };
 
@@ -1168,17 +1234,20 @@ window.manualLookup=function(){
 
 async function bootstrap(){
   render(); // pinta la intro mientras resolvemos
-  let saved='';
-  try{saved=localStorage.getItem(LS_EMAIL)||''}catch(e){}
-  if(!saved||!BACKEND_URL)return;
+  const sess=loadSession();
+  if(!sess||!BACKEND_URL)return;
   try{
-    const data=await apiCall('getMyResults',{email:saved});
+    const data=await apiCall('getMyResults',{email:sess.email,sessionToken:sess.sessionToken});
+    S.email=sess.email;S.sessionToken=sess.sessionToken;
     if(data.found){
-      loadResultIntoState(saved,data.result);
+      loadResultIntoState(sess.email,data.result);
       S.screen='results';S.locked=true;
       render();
     }
-  }catch(e){/* silencioso: quedamos en intro */}
+  }catch(e){
+    // Sesión caducada o inválida: limpiamos y volvemos a la intro
+    clearSession();
+  }
 }
 bootstrap();
 </script>
