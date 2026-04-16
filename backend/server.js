@@ -28,6 +28,7 @@ const STOCK_DOC = db.collection('lbc_orientacion').doc('stock');
 const SCANS_COL = db.collection('lbc_orientacion_scans');
 const RESULTS_COL = db.collection('lbc_orientacion_results');
 const OTPS_COL = db.collection('lbc_orientacion_otps');
+const PROGRESS_COL = db.collection('lbc_orientacion_progress');
 
 function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase();
@@ -65,6 +66,7 @@ app.post(['/', '/api'], async (req, res) => {
       case 'redeem':        result = await actionRedeem(body); break;
       case 'requestOtp':    result = await actionRequestOtp(body); break;
       case 'verifyOtp':     result = await actionVerifyOtp(body); break;
+      case 'saveProgress':  result = await actionSaveProgress(body); break;
       case 'submitResults': result = await actionSubmitResults(body); break;
       case 'getMyResults':  result = await actionGetMyResults(body); break;
       default:              result = { ok: false, error: 'accion desconocida: ' + action };
@@ -347,7 +349,13 @@ async function actionVerifyOtp(body) {
   const resultSnap = await RESULTS_COL.doc(email).get();
   const result = resultSnap.exists ? resultSnap.data() : null;
 
-  return { ok: true, email, sessionToken, result, found: !!result };
+  let progress = null;
+  if (!result) {
+    const progSnap = await PROGRESS_COL.doc(email).get();
+    if (progSnap.exists) progress = progSnap.data();
+  }
+
+  return { ok: true, email, sessionToken, result, found: !!result, progress };
 }
 
 async function requireSession(email, sessionToken) {
@@ -360,6 +368,22 @@ async function requireSession(email, sessionToken) {
   }
   const exp = tsMillis(data.sessionExpiresAt);
   if (!exp || Date.now() > exp) throw new Error('sesión caducada');
+}
+
+async function actionSaveProgress(body) {
+  const email = normalizeEmail(body.email);
+  if (!email) return { ok: false, error: 'email obligatorio' };
+  try {
+    await requireSession(email, body.sessionToken);
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+  await PROGRESS_COL.doc(email).set({
+    answers: body.answers || {},
+    currentQuestion: parseInt(body.currentQuestion, 10) || 0,
+    updatedAt: new Date().toISOString(),
+  });
+  return { ok: true };
 }
 
 async function actionSubmitResults(body) {
@@ -409,6 +433,7 @@ async function actionSubmitResults(body) {
       timestamp: new Date().toISOString(),
     };
     await ref.set(doc);
+    PROGRESS_COL.doc(email).delete().catch(() => {});
 
     // Audit log en Google Sheet (best-effort, no rompe si falla)
     if (SHEET_ID) {
@@ -432,8 +457,9 @@ async function actionGetMyResults(body) {
     return { ok: false, error: e.message };
   }
   const snap = await RESULTS_COL.doc(email).get();
-  if (!snap.exists) return { ok: true, found: false };
-  return { ok: true, found: true, result: snap.data() };
+  if (snap.exists) return { ok: true, found: true, result: snap.data() };
+  const progSnap = await PROGRESS_COL.doc(email).get();
+  return { ok: true, found: false, progress: progSnap.exists ? progSnap.data() : null };
 }
 
 async function appendResultsRow(body, email) {

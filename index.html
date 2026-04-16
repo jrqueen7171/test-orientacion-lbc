@@ -472,6 +472,24 @@ function loadSession(){
   try{const raw=localStorage.getItem(LS_SESSION);if(!raw)return null;const p=JSON.parse(raw);return(p&&p.email&&p.sessionToken)?p:null}catch(e){return null}
 }
 function clearSession(){try{localStorage.removeItem(LS_SESSION)}catch(e){}}
+
+let _saveTimer=null;
+function debouncedSaveProgress(){
+  if(_saveTimer)clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(()=>{
+    if(!S.email||!S.sessionToken||S.locked)return;
+    apiCall('saveProgress',{email:S.email,sessionToken:S.sessionToken,answers:S.ans,currentQuestion:S.cq}).catch(()=>{});
+  },1500);
+}
+function loadProgressIntoState(p){
+  if(!p)return;
+  const ans=p.answers||{};
+  const converted={};
+  Object.keys(ans).forEach(k=>{converted[k]=typeof ans[k]==='number'?ans[k]:parseInt(ans[k],10)});
+  S.ans=converted;
+  S.cq=Math.min(parseInt(p.currentQuestion,10)||0,QS.length-1);
+}
+
 const $=id=>document.getElementById(id);
 const app=document.getElementById('app');
 
@@ -671,8 +689,9 @@ window.submitOtp=async function(){
       render();window.scrollTo({top:0,behavior:'smooth'});
       return;
     }
-    S.ans={};S.cq=0;S.locked=false;
+    S.locked=false;
     S.prizeCode='';S.prizeType=0;S.familyKey='';
+    if(data.progress){loadProgressIntoState(data.progress)}else{S.ans={};S.cq=0}
     S.screen='quiz';render();window.scrollTo({top:0,behavior:'smooth'});
   }catch(e){
     S.otpError=e.message||'Código incorrecto';
@@ -733,12 +752,21 @@ function renderQuiz(){
     ${S.cq===tot-1
       ?`<button class="btn" onclick="finish()" ${sel===undefined?'disabled':''}>Ver resultados</button>`
       :`<button class="btn" onclick="next()" ${sel===undefined?'disabled':''}>Siguiente →</button>`}
+  </div>
+  <div style="text-align:center;margin-top:18px">
+    <button class="btn btn-outline" onclick="exitQuiz()" style="font-size:12px;padding:10px 20px;color:var(--muted);border-color:var(--border)">💾 Salir · Continuar después</button>
   </div>`;
 }
 
-function pick(i){S.ans[QS[S.cq].id]=i;render()}
-function next(){if(S.cq<QS.length-1){S.cq++;render();window.scrollTo({top:0,behavior:'smooth'})}}
+function pick(i){S.ans[QS[S.cq].id]=i;render();debouncedSaveProgress()}
+function next(){if(S.cq<QS.length-1){S.cq++;render();window.scrollTo({top:0,behavior:'smooth'});debouncedSaveProgress()}}
 function prev(){if(S.cq>0){S.cq--;render();window.scrollTo({top:0,behavior:'smooth'})}}
+window.exitQuiz=async function(){
+  if(S.email&&S.sessionToken){
+    try{await apiCall('saveProgress',{email:S.email,sessionToken:S.sessionToken,answers:S.ans,currentQuestion:S.cq})}catch(e){}
+  }
+  S.screen='intro';render();window.scrollTo({top:0,behavior:'smooth'});
+};
 async function finish(){
   const {pcts}=getScores();
   const sorted=Object.entries(pcts).sort((a,b)=>b[1]-a[1]);
@@ -1243,6 +1271,10 @@ async function bootstrap(){
       loadResultIntoState(sess.email,data.result);
       S.screen='results';S.locked=true;
       render();
+    }else if(data.progress){
+      loadProgressIntoState(data.progress);
+      S.locked=false;S.prizeCode='';S.prizeType=0;S.familyKey='';
+      S.screen='quiz';render();
     }
   }catch(e){
     // Sesión caducada o inválida: limpiamos y volvemos a la intro
