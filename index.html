@@ -405,7 +405,7 @@ function pickRandomPrizeType(){return PRIZE_TYPES[Math.floor(Math.random()*PRIZE
 // âââââââââââââââââââââââââââââââââââââââââââ
 // STATE
 // âââââââââââââââââââââââââââââââââââââââââââ
-let S={screen:'intro',cq:0,ans:{},email:'',sessionToken:'',prizeCode:'',prizeType:0,familyKey:'',locked:false,teacherFamily:null,otpError:'',otpInfo:'',liveMode:false};
+let S={screen:'intro',cq:0,ans:{},email:'',sessionToken:'',prizeCode:'',prizeType:0,familyKey:'',locked:false,teacherFamily:null,otpError:'',otpInfo:'',liveMode:false,hasPrize:false};
 let adminPassword='';
 const LS_SESSION='lbc_session';
 function saveSession(email,sessionToken){
@@ -667,11 +667,12 @@ function loadResultIntoState(email,r){
   S.prizeCode=r.prizeCode||'';
   S.prizeType=parseInt(r.prizeType,10)||0;
   S.familyKey=r.familyKey||'';
+  S.hasPrize=!!(S.prizeCode&&S.prizeType>0);
 }
 
 window.logoutStudent=function(){
   clearSession();
-  S.email='';S.sessionToken='';S.ans={};S.cq=0;S.prizeCode='';S.prizeType=0;S.familyKey='';S.locked=false;
+  S.email='';S.sessionToken='';S.ans={};S.cq=0;S.prizeCode='';S.prizeType=0;S.familyKey='';S.locked=false;S.hasPrize=false;
   S.otpError='';S.otpInfo='';
   S.screen='intro';render();window.scrollTo({top:0,behavior:'smooth'});
 };
@@ -716,7 +717,7 @@ window.retakeTest=async function(){
   if(S.liveMode){alert('No se puede repetir el test en modo en vivo.');return}
   try{
     await apiCall('retakeTest',{email:S.email,sessionToken:S.sessionToken});
-    S.ans={};S.cq=0;S.locked=false;S.prizeCode='';S.prizeType=0;S.familyKey='';
+    S.ans={};S.cq=0;S.locked=false;S.prizeCode='';S.prizeType=0;S.familyKey='';S.hasPrize=false;
     S.screen='quiz';render();window.scrollTo({top:0,behavior:'smooth'});
   }catch(e){alert('Error: '+e.message)}
 };
@@ -730,15 +731,29 @@ async function finish(){
   const {pcts}=getScores();
   const sorted=Object.entries(pcts).sort((a,b)=>b[1]-a[1]);
   S.familyKey=sorted[0][0];
-  S.prizeCode=genCode();
-  S.prizeType=pickRandomPrizeType();
+  // Consultar al backend si hay premio disponible
+  S.prizeCode='';S.prizeType=0;S.hasPrize=false;
+  if(BACKEND_URL&&S.liveMode){
+    try{
+      const avail=await apiCall('getAvailablePrize',{familyKey:S.familyKey});
+      if(avail&&avail.hasPrize){
+        S.hasPrize=true;
+        S.prizeCode=genCode();
+        S.prizeType=avail.prizeType;
+      }
+    }catch(e){console.log('getAvailablePrize error',e.message);S.hasPrize=false}
+  }else if(!S.liveMode){
+    // Modo pruebas: asignar premio ficticio
+    S.hasPrize=true;
+    S.prizeCode=genCode();
+    S.prizeType=pickRandomPrizeType();
+  }
   S.screen='results';S.locked=true;
   render();window.scrollTo({top:0,behavior:'smooth'});
   // Persistir en segundo plano
   try{
     const data=await enviarResultados();
     if(data&&data.alreadyExists&&data.result){
-      // Ya había un resultado previo: usamos ese (respetamos el bloqueo server-side)
       loadResultIntoState(S.email,data.result);
       render();
     }
@@ -785,11 +800,15 @@ function renderResults(){
       <div id="sentStatus"></div>
     </div>
 
-    <div class="card stand-banner" style="border:2px solid var(--${wk});background:var(--surface);text-align:center">
+    ${S.hasPrize?`<div class="card stand-banner" style="border:2px solid var(--${wk});background:var(--surface);text-align:center">
       <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--${wk})">Recoge tu premio</div>
       <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:800;margin:6px 0 4px;line-height:1.2">🎁 Ve al stand de ${w.emoji} ${w.nombre}</div>
       <p style="font-size:13px;color:var(--muted);margin-bottom:0">Muestra el código QR de más abajo al profesor/a del stand y te entregará tu premio.</p>
-    </div>
+    </div>`:`<div class="card stand-banner" style="border:2px solid var(--${wk});background:var(--surface);text-align:center">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--${wk})">Tu perfil profesional</div>
+      <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:800;margin:6px 0 4px;line-height:1.2">${w.emoji} ${w.nombre}</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:0">Tu perfil coincide con la familia <strong>${w.nombre}</strong>. Puedes pasarte por el stand de esta familia para solicitar más información.</p>
+    </div>`}
 
     <div class="card">${sorted.map(([k,p])=>`
       <div class="score-card ${k===wk?'win':''}" style="border-left-color:var(--${k})">
@@ -850,13 +869,13 @@ function renderResults(){
       <div class="links" style="margin-top:10px"><a href="${FAM[sk2].url}" target="_blank">Departamento IES</a></div>
     </div>`:''}
 
-    <div class="card qr-section" style="border:2px solid var(--${wk})">
+    ${S.hasPrize?`<div class="card qr-section" style="border:2px solid var(--${wk})">
       <h3 style="font-family:'Fraunces',serif;font-size:20px;margin-bottom:4px">🎁 Tu código QR del premio</h3>
       <p style="font-size:13px;color:var(--muted);margin-bottom:6px">Ve al stand de <strong>${w.emoji} ${w.nombre}</strong> y muestra este QR al profesor/a.</p>
       <div class="qr-number">${S.prizeCode}</div>
       <div class="qr-code" id="qrCodeDiv"></div>
       <p class="qr-note">Este QR sólo se puede canjear una vez.</p>
-    </div>
+    </div>`:''}
 
     <div class="card info-section">
       <h3>ℹ️ Sobre este test</h3>
@@ -873,13 +892,15 @@ function renderResults(){
     <p class="footer">IES Luis Bueno Crespo · Avda. Las Palmeras s/n · 18100 Armilla · ☎ 958 89 37 39<br>Este test sólo se realiza una vez por correo.</p>
   </div>`;
 
-  setTimeout(()=>{
-    const qd=$('qrCodeDiv');
-    if(qd&&typeof QRCode!=='undefined'){
-      qd.innerHTML='';
-      new QRCode(qd,{text:JSON.stringify({code:S.prizeCode,email:S.email,family:w.nombre,familyKey:wk,score:sorted[0][1],prizeType:S.prizeType,date:new Date().toISOString().split('T')[0]}),width:220,height:220,colorDark:"#1b1b1f",colorLight:"#ffffff"});
-    }
-  },200);
+  if(S.hasPrize){
+    setTimeout(()=>{
+      const qd=$('qrCodeDiv');
+      if(qd&&typeof QRCode!=='undefined'){
+        qd.innerHTML='';
+        new QRCode(qd,{text:JSON.stringify({code:S.prizeCode,email:S.email,family:w.nombre,familyKey:wk,score:sorted[0][1],prizeType:S.prizeType,date:new Date().toISOString().split('T')[0]}),width:220,height:220,colorDark:"#1b1b1f",colorLight:"#ffffff"});
+      }
+    },200);
+  }
   setTimeout(()=>renderFeedback('all'),50);
 }
 

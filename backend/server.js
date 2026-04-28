@@ -75,6 +75,7 @@ app.post(['/', '/api'], async (req, res) => {
       case 'adminGetStats':  result = await actionAdminGetStats(body); break;
       // Student
       case 'getMode':       result = await actionGetMode(); break;
+      case 'getAvailablePrize': result = await actionGetAvailablePrize(body); break;
       case 'requestOtp':    result = await actionRequestOtp(body); break;
       case 'verifyOtp':     result = await actionVerifyOtp(body); break;
       case 'saveProgress':  result = await actionSaveProgress(body); break;
@@ -309,6 +310,20 @@ async function actionAdminGetStats(body) {
 async function actionGetMode() {
   const cfg = await readConfig();
   return { ok: true, liveMode: !!cfg.liveMode };
+}
+
+async function actionGetAvailablePrize(body) {
+  const familyKey = body.familyKey;
+  if (!FAMILIES.includes(familyKey)) return { ok: false, error: 'familia no válida' };
+  const stock = await readStock();
+  const fc = stock[familyKey];
+  // Intentar asignar un tipo aleatorio que tenga stock
+  const available = PRIZE_TYPES.filter(pt => fc.counts[pt - 1] > 0);
+  if (available.length === 0) {
+    return { ok: true, hasPrize: false };
+  }
+  const prizeType = available[Math.floor(Math.random() * available.length)];
+  return { ok: true, hasPrize: true, prizeType };
 }
 
 /* ───── OTP / sesión de alumnado ───── */
