@@ -281,25 +281,10 @@ options:[{text:"Propongo dividir esa parte o alternar, buscando que ambos aporte
 idealExplanation:"Buscar soluciones creativas donde ambas partes ganen es la esencia de la negociación colaborativa.",
 wrongExplanation:"Ceder siempre frustra. Imponer genera resentimiento. Consejo: ante un conflicto de intereses, piensa en opciones creativas."},
 
-{id:25,section:"soft",skill:"negociacion",text:"¿Cuál es la clave de una buena negociación para ti?",
-options:[{text:"Preparación (datos), escucha activa y buscar que ambas partes ganen",scores:{admin:3,comercio:3,obra:2,electro:2,textil:1},correct:true},{text:"Ser más listo que el otro y obtener la mayor ventaja",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Tener paciencia y esperar a que el otro ceda",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"No negociar: si algo no me gusta, busco otra opción",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
-idealExplanation:"La negociación profesional se basa en preparación, escucha y acuerdos mutuamente beneficiosos.",
-wrongExplanation:"Ver la negociación como batalla genera relaciones tóxicas. Consejo: prepara siempre tus datos, tu objetivo mínimo y una alternativa."},
-
 {id:26,section:"soft",skill:"organizacion",text:"¿Cómo organizas tus materiales de estudio o trabajo?",
 options:[{text:"Digital y físicamente ordenado: carpetas etiquetadas, archivos con nombre lógico",scores:{admin:3,comercio:1,obra:2,electro:2,textil:0},correct:true},{text:"Tengo un orden mental pero mi escritorio es un caos",scores:{admin:0,comercio:1,obra:0,electro:1,textil:1},correct:false},{text:"Solo ordeno cuando busco algo y no lo encuentro",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Lo organizo de forma visual: colores, post-its, mood boards",scores:{admin:0,comercio:1,obra:0,electro:0,textil:3},correct:false}],
 idealExplanation:"La organización sistemática ahorra tiempo y reduce errores. Es especialmente valorada en administración e ingeniería.",
 wrongExplanation:"El 'orden mental' falla cuando hay mucho volumen. Consejo: convención de nombres (FECHA_ASIGNATURA_Tema) y 5 min al día para ordenar."},
-
-{id:27,section:"soft",skill:"organizacion",text:"Tienes 5 tareas urgentes y solo puedes hacer 3 hoy. ¿Cómo decides?",
-options:[{text:"Evalúo impacto y urgencia, hago primero las de mayor consecuencia",scores:{admin:3,comercio:2,obra:3,electro:2,textil:0},correct:true},{text:"Hago las que me gustan primero",scores:{admin:0,comercio:0,obra:0,electro:0,textil:1},correct:false},{text:"Intento hacer las 5 aunque sea a medias",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Empiezo por la más rápida para ir tachando",scores:{admin:1,comercio:1,obra:0,electro:1,textil:1},correct:false}],
-idealExplanation:"Priorizar por impacto y urgencia (Matriz de Eisenhower) es la técnica más efectiva de gestión del tiempo.",
-wrongExplanation:"Hacer todo a medias garantiza mala calidad. Consejo: clasifica en 4 cuadrantes: urgente+importante, importante no urgente, urgente no importante, ni una ni otra."},
-
-{id:28,section:"soft",skill:"organizacion",text:"¿Qué opinas de los plazos y fechas límite?",
-options:[{text:"Son necesarios: me ayudan a estructurar mi trabajo y cumplir objetivos",scores:{admin:3,comercio:2,obra:3,electro:3,textil:1},correct:true},{text:"Me agobinan, prefiero trabajar a mi ritmo",scores:{admin:0,comercio:0,obra:0,electro:0,textil:1},correct:false},{text:"Los cumplo solo si alguien los controla",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false},{text:"Son orientativos, no hay que tomárselos tan en serio",scores:{admin:0,comercio:0,obra:0,electro:0,textil:0},correct:false}],
-idealExplanation:"Los plazos son la columna vertebral de cualquier proyecto. Verlos como aliados es madurez profesional.",
-wrongExplanation:"Si te agobinan, el problema está en la planificación. Consejo: divide cada plazo final en mini-plazos intermedios con margen."},
 
 {id:29,section:"soft",skill:"creatividad",text:"Si pudieras crear algo desde cero, ¿qué elegirías?",
 options:[{text:"Un sistema de gestión empresarial eficiente",scores:{admin:3,comercio:0,obra:1,electro:2,textil:0},correct:false},{text:"Una campaña de marketing viral o tienda online",scores:{admin:0,comercio:3,obra:0,electro:0,textil:1},correct:false},{text:"Un puente, edificio sostenible o instalación técnica",scores:{admin:0,comercio:0,obra:3,electro:2,textil:0},correct:false},{text:"Una colección de moda o vestuario para una película",scores:{admin:0,comercio:0,obra:0,electro:0,textil:3},correct:false}],
@@ -405,7 +390,8 @@ function pickRandomPrizeType(){return PRIZE_TYPES[Math.floor(Math.random()*PRIZE
 // âââââââââââââââââââââââââââââââââââââââââââ
 // STATE
 // âââââââââââââââââââââââââââââââââââââââââââ
-let S={screen:'intro',cq:0,ans:{},email:'',sessionToken:'',prizeCode:'',prizeType:0,familyKey:'',locked:false,teacherFamily:null,otpError:'',otpInfo:'',liveMode:false,hasPrize:false};
+let S={screen:'intro',cq:0,ans:{},email:'',sessionToken:'',prizeCode:'',prizeType:0,familyKey:'',locked:false,teacherFamily:null,otpError:'',otpInfo:'',liveMode:false,hasPrize:false,secondsPerQuestion:0,timerSeconds:0,timerForQuestion:-1};
+let questionTimerId=null;
 let adminPassword='';
 const LS_SESSION='lbc_session';
 function saveSession(email,sessionToken){
@@ -629,6 +615,7 @@ window.submitOtp=async function(){
     const data=await apiCall('verifyOtp',{email:S.email,code});
     S.sessionToken=data.sessionToken||'';
     S.liveMode=!!data.liveMode;
+    if(data.secondsPerQuestion!==undefined)S.secondsPerQuestion=parseInt(data.secondsPerQuestion,10)||0;
     saveSession(S.email,S.sessionToken);
     if(data.found&&data.result){
       loadResultIntoState(S.email,data.result);
@@ -671,21 +658,53 @@ function loadResultIntoState(email,r){
 }
 
 window.logoutStudent=function(){
+  stopQuestionTimer();
   clearSession();
   S.email='';S.sessionToken='';S.ans={};S.cq=0;S.prizeCode='';S.prizeType=0;S.familyKey='';S.locked=false;S.hasPrize=false;
   S.otpError='';S.otpInfo='';
   S.screen='intro';render();window.scrollTo({top:0,behavior:'smooth'});
 };
 
+function stopQuestionTimer(){
+  if(questionTimerId){clearInterval(questionTimerId);questionTimerId=null}
+  S.timerForQuestion=-1;
+}
+function fmtTime(s){const m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x}
+function startQuestionTimer(){
+  const limit=parseInt(S.secondsPerQuestion,10)||0;
+  if(limit<=0)return;
+  if(S.timerForQuestion===S.cq&&questionTimerId)return;
+  stopQuestionTimer();
+  S.timerForQuestion=S.cq;
+  S.timerSeconds=limit;
+  const tick=()=>{
+    if(S.screen!=='quiz'){stopQuestionTimer();return}
+    const el=document.getElementById('qTimer');
+    if(el)el.textContent=fmtTime(S.timerSeconds);
+    if(S.timerSeconds<=0){
+      stopQuestionTimer();
+      if(S.cq>=QS.length-1){finish()}else{next()}
+      return;
+    }
+    S.timerSeconds--;
+  };
+  tick();
+  questionTimerId=setInterval(tick,1000);
+}
 function renderQuiz(){
   const q=QS[S.cq],tot=QS.length,pct=Math.round(S.cq/tot*100);
   const sl=q.section==='soft'?`Soft Skills — ${SSKILLS[q.skill]||''}`:'Aptitudes Técnicas';
   const sel=S.ans[q.id];
+  const limit=parseInt(S.secondsPerQuestion,10)||0;
   const modeTag=S.liveMode
     ?'<div style="text-align:center;padding:8px;background:var(--green-light);border-radius:8px;margin-bottom:10px;font-size:11px;font-weight:700;color:var(--green)">✅ Encuesta validada — No es de prueba</div>'
     :'<div style="text-align:center;padding:8px;background:var(--amber-light);border-radius:8px;margin-bottom:10px;font-size:11px;font-weight:700;color:var(--amber)">🧪 Modo pruebas</div>';
+  const timerTag=limit>0
+    ?`<div style="text-align:center;padding:10px;background:var(--surface);border:2px solid var(--accent);border-radius:8px;margin-bottom:10px"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px">⏱ Tiempo restante</span><div id="qTimer" style="font-family:'Fraunces',serif;font-size:24px;font-weight:800;color:var(--accent);margin-top:2px">${fmtTime(limit)}</div></div>`
+    :'';
   app.innerHTML=`
   ${modeTag}
+  ${timerTag}
   <div class="prog-wrap">
     <div class="prog-top"><strong>Pregunta ${S.cq+1} de ${tot}</strong><span>${pct}%</span></div>
     <div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div>
@@ -708,6 +727,7 @@ function renderQuiz(){
   <div style="text-align:center;margin-top:18px">
     <button class="btn btn-outline" onclick="exitQuiz()" style="font-size:12px;padding:10px 20px;color:var(--muted);border-color:var(--border)">💾 Salir · Continuar después</button>
   </div>`;
+  startQuestionTimer();
 }
 
 function pick(i){S.ans[QS[S.cq].id]=i;render();debouncedSaveProgress()}
@@ -722,12 +742,14 @@ window.retakeTest=async function(){
   }catch(e){alert('Error: '+e.message)}
 };
 window.exitQuiz=async function(){
+  stopQuestionTimer();
   if(S.email&&S.sessionToken){
     try{await apiCall('saveProgress',{email:S.email,sessionToken:S.sessionToken,answers:S.ans,currentQuestion:S.cq})}catch(e){}
   }
   S.screen='intro';render();window.scrollTo({top:0,behavior:'smooth'});
 };
 async function finish(){
+  stopQuestionTimer();
   const {pcts}=getScores();
   const sorted=Object.entries(pcts).sort((a,b)=>b[1]-a[1]);
   S.familyKey=sorted[0][0];
@@ -1318,6 +1340,18 @@ function renderAdmin(){
   </div>
 
   <div class="card">
+    <h3 style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:6px">⏱ Tiempo por pregunta</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Segundos que tendrá cada alumno para contestar cada pregunta. <strong>0 = sin límite</strong>. Se aplica a partir del próximo test que empiece.</p>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input id="timerSeconds" type="number" min="0" max="600" step="5" value="${parseInt(cfg.secondsPerQuestion,10)||0}"
+        style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Outfit';font-size:14px;outline:none">
+      <span style="font-size:12px;color:var(--muted)">segundos</span>
+      <button class="btn" style="padding:10px 14px;font-size:12px" onclick="adminSaveTimer()">Guardar</button>
+    </div>
+    <p id="timerMsg" style="font-size:12px;margin-top:8px;min-height:16px"></p>
+  </div>
+
+  <div class="card">
     <h3 style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:6px">🎁 Configurar premios</h3>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Al guardar se activa el <strong>modo en vivo</strong>. Los alumnos no podrán repetir el test.</p>
     <div style="display:flex;gap:8px;margin-bottom:14px">
@@ -1457,6 +1491,18 @@ window.adminClearAllData=async function(){
   }catch(e){if(msg){msg.style.color='var(--red)';msg.textContent='Error: '+e.message}}
 };
 
+window.adminSaveTimer=async function(){
+  const v=parseInt(($('timerSeconds')||{}).value||'0',10);
+  const msg=$('timerMsg');
+  if(isNaN(v)||v<0||v>600){if(msg){msg.style.color='var(--red)';msg.textContent='Introduce un valor entre 0 y 600.'}return}
+  try{
+    await apiCall('adminSetTimer',{adminPassword,secondsPerQuestion:v});
+    if(adminConfig)adminConfig.secondsPerQuestion=v;
+    S.secondsPerQuestion=v;
+    if(msg){msg.style.color='var(--green)';msg.textContent=v===0?'✅ Guardado. Sin límite de tiempo.':'✅ Guardado. '+v+' segundos por pregunta.'}
+  }catch(e){if(msg){msg.style.color='var(--red)';msg.textContent='Error: '+e.message}}
+};
+
 window.adminChangeTeacherPw=async function(){
   const np=($('newTeacherPw')||{}).value||'';
   const msg=$('pwMsg');
@@ -1518,7 +1564,7 @@ const FKEYS_FOR_ADMIN=Object.keys(FAM);
 async function bootstrap(){
   render();
   // Fetch live mode status
-  if(BACKEND_URL){try{const m=await apiCall('getMode',{});S.liveMode=!!m.liveMode}catch(e){}}
+  if(BACKEND_URL){try{const m=await apiCall('getMode',{});S.liveMode=!!m.liveMode;if(m.secondsPerQuestion!==undefined)S.secondsPerQuestion=parseInt(m.secondsPerQuestion,10)||0}catch(e){}}
   const sess=loadSession();
   if(!sess||!BACKEND_URL)return;
   try{

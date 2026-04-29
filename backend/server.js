@@ -70,6 +70,7 @@ app.post(['/', '/api'], async (req, res) => {
       case 'adminLogin':    result = await actionAdminLogin(body); break;
       case 'adminSetTeacherPassword': result = await actionAdminSetTeacherPassword(body); break;
       case 'adminSetAdminPassword':   result = await actionAdminSetAdminPassword(body); break;
+      case 'adminSetTimer':           result = await actionAdminSetTimer(body); break;
       case 'adminSetPrizes': result = await actionAdminSetPrizes(body); break;
       case 'adminResetTestMode': result = await actionAdminResetTestMode(body); break;
       case 'adminClearAllData': result = await actionAdminClearAllData(body); break;
@@ -101,6 +102,7 @@ async function readConfig() {
     adminPassword: ADMIN_PASSWORD_DEFAULT,
     liveMode: false,
     configuredAt: null,
+    secondsPerQuestion: 0,
   };
   await CONFIG_DOC.set(defaults);
   return defaults;
@@ -234,6 +236,14 @@ async function actionAdminSetAdminPassword(body) {
   return { ok: true };
 }
 
+async function actionAdminSetTimer(body) {
+  await checkAdminAuth(body);
+  const s = parseInt(body.secondsPerQuestion, 10);
+  if (isNaN(s) || s < 0 || s > 600) return { ok: false, error: 'Valor entre 0 y 600 segundos.' };
+  await CONFIG_DOC.update({ secondsPerQuestion: s });
+  return { ok: true, secondsPerQuestion: s };
+}
+
 async function actionAdminSetPrizes(body) {
   await checkAdminAuth(body);
   const mode = body.mode; // 'uniform' or 'custom'
@@ -345,7 +355,7 @@ async function actionAdminGetStats(body) {
 
 async function actionGetMode() {
   const cfg = await readConfig();
-  return { ok: true, liveMode: !!cfg.liveMode };
+  return { ok: true, liveMode: !!cfg.liveMode, secondsPerQuestion: parseInt(cfg.secondsPerQuestion, 10) || 0 };
 }
 
 async function actionGetAvailablePrize(body) {
@@ -485,7 +495,7 @@ async function actionVerifyOtp(body) {
     if (progSnap.exists) progress = progSnap.data();
   }
 
-  return { ok: true, email, sessionToken, result, found: !!result, progress, liveMode: !!cfg.liveMode };
+  return { ok: true, email, sessionToken, result, found: !!result, progress, liveMode: !!cfg.liveMode, secondsPerQuestion: parseInt(cfg.secondsPerQuestion, 10) || 0 };
 }
 
 async function requireSession(email, sessionToken) {
