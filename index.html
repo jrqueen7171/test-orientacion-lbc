@@ -1334,6 +1334,13 @@ function renderAdmin(){
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Cargando…</p>
   </div>
 
+  <div class="card" style="border:2px solid var(--red)">
+    <h3 style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:6px;color:var(--red)">🗑️ Zona peligrosa</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Borra todos los datos para empezar limpio antes del concurso: resultados de alumnos, escaneos, OTPs y progreso. También resetea el stock y vuelve a modo pruebas.</p>
+    <button class="btn btn-outline" style="width:100%;border-color:var(--red);color:var(--red)" onclick="adminClearAllData()">🗑️ Borrar todos los datos</button>
+    <p id="clearDataMsg" style="font-size:12px;margin-top:8px;min-height:16px"></p>
+  </div>
+
   <button class="btn btn-outline" style="width:100%" onclick="adminPassword='';adminConfig=null;adminStock=null;S.screen='intro';render()">🚪 Cerrar sesión</button>
   <p class="footer">IES Luis Bueno Crespo · Administración</p>`;
 
@@ -1434,6 +1441,20 @@ window.adminResetTestMode=async function(){
     adminConfig.liveMode=false;adminConfig.initialStock=null;
     S.screen='admin';render();
   }catch(e){alert('Error: '+e.message)}
+};
+
+window.adminClearAllData=async function(){
+  if(!confirm('⚠️ Esto borrará TODOS los resultados de alumnos, escaneos, OTPs y progreso. También reseteará el stock y volverá a modo pruebas. ¿Continuar?'))return;
+  if(!confirm('Última confirmación: esta acción NO se puede deshacer. ¿Borrar todos los datos?'))return;
+  const msg=$('clearDataMsg');
+  if(msg){msg.style.color='var(--muted)';msg.textContent='Borrando…'}
+  try{
+    const data=await apiCall('adminClearAllData',{adminPassword});
+    const d=data.deleted||{};
+    if(msg){msg.style.color='var(--green)';msg.textContent=`✅ Borrados: ${d.results||0} resultados, ${d.scans||0} escaneos, ${d.otps||0} OTPs, ${d.progress||0} progresos.`}
+    adminConfig.liveMode=false;adminConfig.initialStock=null;
+    setTimeout(()=>{S.screen='admin';render()},1500);
+  }catch(e){if(msg){msg.style.color='var(--red)';msg.textContent='Error: '+e.message}}
 };
 
 window.adminChangeTeacherPw=async function(){

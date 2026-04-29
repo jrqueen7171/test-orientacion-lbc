@@ -72,6 +72,7 @@ app.post(['/', '/api'], async (req, res) => {
       case 'adminSetAdminPassword':   result = await actionAdminSetAdminPassword(body); break;
       case 'adminSetPrizes': result = await actionAdminSetPrizes(body); break;
       case 'adminResetTestMode': result = await actionAdminResetTestMode(body); break;
+      case 'adminClearAllData': result = await actionAdminClearAllData(body); break;
       case 'adminGetStats':  result = await actionAdminGetStats(body); break;
       // Student
       case 'getMode':       result = await actionGetMode(); break;
@@ -283,6 +284,36 @@ async function actionAdminResetTestMode(body) {
   for (const f of FAMILIES) emptyStock[f] = defaultStockFamily();
   await STOCK_DOC.set(emptyStock);
   return { ok: true };
+}
+
+async function deleteCollection(col, batchSize = 200) {
+  let total = 0;
+  while (true) {
+    const snap = await col.limit(batchSize).get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    snap.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    total += snap.size;
+    if (snap.size < batchSize) break;
+  }
+  return total;
+}
+
+async function actionAdminClearAllData(body) {
+  await checkAdminAuth(body);
+  const [results, scans, otps, progress] = await Promise.all([
+    deleteCollection(RESULTS_COL),
+    deleteCollection(SCANS_COL),
+    deleteCollection(OTPS_COL),
+    deleteCollection(PROGRESS_COL),
+  ]);
+  // Reset stock + back to test mode
+  await CONFIG_DOC.update({ liveMode: false, initialStock: null, configuredAt: null });
+  const emptyStock = {};
+  for (const f of FAMILIES) emptyStock[f] = defaultStockFamily();
+  await STOCK_DOC.set(emptyStock);
+  return { ok: true, deleted: { results, scans, otps, progress } };
 }
 
 async function actionAdminGetStats(body) {
