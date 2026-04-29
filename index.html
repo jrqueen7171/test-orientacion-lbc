@@ -1184,7 +1184,9 @@ async function redeemPrize(info,tid){
   const prizeName=data.prizeName||('Premio tipo '+pt);
 
   let stockNote='';
-  if(data.redeemed){
+  if(data.testMode){
+    stockNote=`<p style="font-size:12px;color:var(--amber);margin-top:6px">🧪 <strong>MODO PRUEBAS</strong> — no se descuenta del stock. Útil para testear la app.</p>`;
+  }else if(data.redeemed){
     stockNote=`<p style="font-size:12px;color:var(--green);margin-top:6px">✓ Descontado del stock. Quedan <strong>${data.remaining}</strong> premios de tipo ${pt}.</p>`;
   }else if(data.alreadyRedeemed){
     const prev=data.previousScan||{};
@@ -1193,16 +1195,22 @@ async function redeemPrize(info,tid){
     stockNote=`<p style="font-size:12px;color:var(--red);margin-top:6px">⚠️ Sin stock disponible de tipo ${pt}. Asigna otro premio manualmente.</p>`;
   }
 
-  t.innerHTML=`<div class="card" style="border:2px solid var(--green);margin-bottom:0">
-    <h3 style="font-family:'Fraunces',serif;font-size:18px;color:var(--green);margin-bottom:10px">🎓 Datos del alumno/a</h3>
+  const borderColor=data.testMode?'var(--amber)':'var(--green)';
+  const headerColor=data.testMode?'var(--amber)':'var(--green)';
+  const bgColor=data.testMode?'var(--amber-light)':'var(--green-light)';
+  const testBanner=data.testMode?`<div style="background:var(--amber-light);border:1px solid var(--amber);border-radius:8px;padding:8px 12px;margin-bottom:12px;text-align:center"><span style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--amber)">🧪 Modo pruebas</span></div>`:'';
+
+  t.innerHTML=`<div class="card" style="border:2px solid ${borderColor};margin-bottom:0">
+    ${testBanner}
+    <h3 style="font-family:'Fraunces',serif;font-size:18px;color:${headerColor};margin-bottom:10px">🎓 Datos del alumno/a</h3>
     <p style="font-size:13px;word-break:break-all"><strong>Correo:</strong> ${info.email||info.name||'—'}</p>
     <p style="font-size:13px"><strong>Código:</strong> ${info.code||'—'}</p>
     <p style="font-size:13px"><strong>Familia recomendada:</strong> ${info.family||'—'} ✓</p>
     <p style="font-size:13px"><strong>Puntuación:</strong> ${info.score||'—'}%</p>
     <p style="font-size:13px"><strong>Fecha:</strong> ${info.date||'—'}</p>
-    <div style="margin-top:14px;padding:18px;background:var(--green-light);border-radius:10px;text-align:center">
+    <div style="margin-top:14px;padding:18px;background:${bgColor};border-radius:10px;text-align:center">
       <div class="prize-label">🎁 Premio asignado</div>
-      <div style="font-family:'Fraunces',serif;font-size:14px;color:var(--green);font-weight:700;margin-top:4px">TIPO ${pt}</div>
+      <div style="font-family:'Fraunces',serif;font-size:14px;color:${headerColor};font-weight:700;margin-top:4px">TIPO ${pt}</div>
       <div class="prize-name" style="margin-top:6px">${prizeName}</div>
       ${stockNote}
     </div>

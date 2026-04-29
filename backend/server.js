@@ -164,7 +164,6 @@ async function actionGetStock(body) {
 
 async function actionRedeem(body) {
   const cfg = await checkTeacherAuth(body);
-  if (!cfg.liveMode) return { ok: false, error: 'El sistema está en modo pruebas. El administrador debe configurar los premios primero.' };
   const f = body.family;
   if (!FAMILIES.includes(f)) return { ok: false, error: 'familia no válida' };
   const pt = parseInt(body.prizeType, 10);
@@ -174,7 +173,13 @@ async function actionRedeem(body) {
   if (!code) return { ok: false, error: 'código vacío' };
 
   if (body.qrFamilyKey && body.qrFamilyKey !== f) {
-    return { ok: true, wrongStand: true, expectedFamily: body.qrFamilyKey, teacherFamily: f };
+    return { ok: true, wrongStand: true, expectedFamily: body.qrFamilyKey, teacherFamily: f, testMode: !cfg.liveMode };
+  }
+
+  if (!cfg.liveMode) {
+    const stock = await readStock();
+    const prizeName = stock[f].names[idx];
+    return { ok: true, testMode: true, prizeName, prizeType: pt, stock };
   }
 
   const scanRef = SCANS_COL.doc(code);
