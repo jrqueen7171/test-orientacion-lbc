@@ -552,12 +552,33 @@ function renderEmail(){
       onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'"
       onkeypress="if(event.key==='Enter')submitEmail()">
     <p id="emailErr" style="color:var(--red);font-size:13px;margin-top:8px;min-height:18px"></p>
-    <button id="emailBtn" class="btn btn-full" style="margin-top:6px" onclick="submitEmail()">Continuar →</button>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-top:6px;cursor:pointer">
+      <input id="consentChk" type="checkbox" style="margin-top:3px;flex-shrink:0;width:18px;height:18px;accent-color:var(--green)">
+      <span>He leído y acepto el <a href="#" onclick="event.preventDefault();showPrivacyModal()" style="color:var(--green);text-decoration:underline;font-weight:600">aviso de protección de datos</a> del IES Luis Bueno Crespo.</span>
+    </label>
+    <button id="emailBtn" class="btn btn-full" style="margin-top:14px" onclick="submitEmail()">Continuar →</button>
     <button class="btn btn-outline btn-full" style="margin-top:8px" onclick="S.screen='intro';render()">← Volver</button>
   </div>
-  <p class="footer">🔒 Sólo guardamos tu correo para mostrarte tus resultados en futuras visitas.</p>`;
+  <p class="footer">🔒 Tu correo se usa para verificar tu identidad y mostrarte tus resultados. Lee el aviso completo.</p>
+  <div id="privacyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;padding:20px;overflow-y:auto" onclick="if(event.target===this)closePrivacyModal()">
+    <div style="max-width:600px;margin:30px auto;background:var(--surface);border-radius:12px;padding:24px;font-size:14px;line-height:1.6">
+      <h2 style="font-family:'Fraunces',serif;font-size:22px;margin-bottom:14px">Aviso de protección de datos</h2>
+      <p><strong>Responsable:</strong> IES Luis Bueno Crespo · Avda. Las Palmeras s/n · 18100 Armilla (Granada) · ☎ 958 89 37 39.</p>
+      <p style="margin-top:10px"><strong>Finalidad:</strong> realizar un test orientativo de familia profesional, mostrarte un informe personalizado y, en su caso, asignarte un código QR para canjear un premio en el stand correspondiente del centro.</p>
+      <p style="margin-top:10px"><strong>Base jurídica:</strong> consentimiento del interesado (art. 6.1.a RGPD) y misión de orientación educativa atribuida al centro (art. 6.1.e RGPD).</p>
+      <p style="margin-top:10px"><strong>Datos recogidos:</strong> tu correo electrónico, las respuestas del cuestionario y el resultado calculado. No recogemos nombre, edad, DNI ni información de salud.</p>
+      <p style="margin-top:10px"><strong>Conservación:</strong> los datos se borrarán al finalizar la actividad de orientación del curso académico. Puedes solicitar la eliminación inmediata escribiendo al centro.</p>
+      <p style="margin-top:10px"><strong>Destinatarios:</strong> los datos se almacenan en servidores de Google Cloud (UE) y, para enviar el código de verificación, se transmite tu correo a Gmail (Google Ireland). No se cederán a terceros con fines comerciales.</p>
+      <p style="margin-top:10px"><strong>Derechos:</strong> puedes acceder, rectificar, suprimir, oponerte u oponerte al tratamiento, así como solicitar la portabilidad de tus datos, dirigiéndote al IES por los medios indicados arriba. También puedes presentar una reclamación ante la Agencia Española de Protección de Datos (www.aepd.es).</p>
+      <p style="margin-top:10px"><strong>Menores:</strong> si eres menor de 14 años, debes contar con el consentimiento de tu padre/madre/tutor legal antes de aceptar este aviso.</p>
+      <button class="btn btn-full" style="margin-top:16px" onclick="closePrivacyModal()">Cerrar</button>
+    </div>
+  </div>`;
   setTimeout(()=>{const i=$('emailInput');if(i)i.focus()},100);
 }
+
+window.showPrivacyModal=function(){const m=$('privacyModal');if(m)m.style.display='block'};
+window.closePrivacyModal=function(){const m=$('privacyModal');if(m)m.style.display='none'};
 
 function validEmail(e){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)}
 
@@ -565,11 +586,14 @@ window.submitEmail=async function(){
   const i=$('emailInput');
   const err=$('emailErr');
   const btn=$('emailBtn');
+  const chk=$('consentChk');
   const email=(i?i.value:'').trim().toLowerCase();
   if(!validEmail(email)){err.textContent='Introduce un correo electrónico válido.';return}
+  if(!chk||!chk.checked){err.textContent='Debes aceptar el aviso de protección de datos para continuar.';return}
   err.textContent='';
   if(btn){btn.disabled=true;btn.textContent='Enviando código…'}
   try{
+    await apiCall('recordConsent',{email,accepted:true});
     await apiCall('requestOtp',{email});
     S.email=email;S.otpError='';S.otpInfo='Hemos enviado un código de 6 dígitos a '+email+'. Revisa tu bandeja (y la carpeta de spam).';
     S.screen='otp';render();window.scrollTo({top:0,behavior:'smooth'});
@@ -657,12 +681,16 @@ function loadResultIntoState(email,r){
   S.hasPrize=!!(S.prizeCode&&S.prizeType>0);
 }
 
-window.logoutStudent=function(){
+window.logoutStudent=async function(){
   stopQuestionTimer();
+  const prevEmail=S.email,prevToken=S.sessionToken;
   clearSession();
   S.email='';S.sessionToken='';S.ans={};S.cq=0;S.prizeCode='';S.prizeType=0;S.familyKey='';S.locked=false;S.hasPrize=false;
   S.otpError='';S.otpInfo='';
   S.screen='intro';render();window.scrollTo({top:0,behavior:'smooth'});
+  if(prevEmail&&prevToken&&BACKEND_URL){
+    apiCall('logout',{email:prevEmail,sessionToken:prevToken}).catch(()=>{});
+  }
 };
 
 function stopQuestionTimer(){
@@ -1320,18 +1348,19 @@ function renderAdmin(){
 
   <div class="card">
     <h3 style="font-family:'Fraunces',serif;font-size:16px;margin-bottom:10px">🔑 Contraseñas</h3>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Por seguridad, las contraseñas actuales no se muestran. Introduce una nueva y pulsa Guardar para cambiarla.</p>
     <div style="margin-bottom:14px">
-      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Contraseña del profesorado</label>
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Nueva contraseña del profesorado</label>
       <div style="display:flex;gap:6px;margin-top:4px">
-        <input id="newTeacherPw" type="text" value="${(cfg.teacherPassword||'').replace(/"/g,'&quot;')}"
+        <input id="newTeacherPw" type="password" placeholder="Mínimo 4 caracteres" autocomplete="new-password"
           style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Outfit';font-size:14px;outline:none">
         <button class="btn" style="padding:10px 14px;font-size:12px" onclick="adminChangeTeacherPw()">Guardar</button>
       </div>
     </div>
     <div>
-      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Contraseña del administrador</label>
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Nueva contraseña del administrador</label>
       <div style="display:flex;gap:6px;margin-top:4px">
-        <input id="newAdminPw" type="text" value="${(cfg.adminPassword||'').replace(/"/g,'&quot;')}"
+        <input id="newAdminPw" type="password" placeholder="Mínimo 4 caracteres" autocomplete="new-password"
           style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Outfit';font-size:14px;outline:none">
         <button class="btn btn-dark" style="padding:10px 14px;font-size:12px" onclick="adminChangeAdminPw()">Guardar</button>
       </div>
@@ -1504,22 +1533,27 @@ window.adminSaveTimer=async function(){
 };
 
 window.adminChangeTeacherPw=async function(){
-  const np=($('newTeacherPw')||{}).value||'';
+  const inp=$('newTeacherPw');
+  const np=(inp||{}).value||'';
   const msg=$('pwMsg');
+  if(np.length<4){if(msg){msg.style.color='var(--red)';msg.textContent='Mínimo 4 caracteres.'}return}
   try{
     await apiCall('adminSetTeacherPassword',{adminPassword,newPassword:np});
-    adminConfig.teacherPassword=np;
+    if(inp)inp.value='';
     if(msg){msg.style.color='var(--green)';msg.textContent='✅ Contraseña del profesorado actualizada.'}
   }catch(e){if(msg){msg.style.color='var(--red)';msg.textContent=e.message}}
 };
 
 window.adminChangeAdminPw=async function(){
-  const np=($('newAdminPw')||{}).value||'';
+  const inp=$('newAdminPw');
+  const np=(inp||{}).value||'';
   const msg=$('pwMsg');
+  if(np.length<4){if(msg){msg.style.color='var(--red)';msg.textContent='Mínimo 4 caracteres.'}return}
   try{
     await apiCall('adminSetAdminPassword',{adminPassword,newPassword:np});
-    adminPassword=np;adminConfig.adminPassword=np;
-    if(msg){msg.style.color='var(--green)';msg.textContent='✅ Contraseña de administrador actualizada.'}
+    adminPassword=np;
+    if(inp)inp.value='';
+    if(msg){msg.style.color='var(--green)';msg.textContent='✅ Contraseña de administrador actualizada. Tu sesión sigue activa.'}
   }catch(e){if(msg){msg.style.color='var(--red)';msg.textContent=e.message}}
 };
 

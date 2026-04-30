@@ -31,6 +31,14 @@ const SCANS_COL = db.collection('lbc_orientacion_scans');
 const RESULTS_COL = db.collection('lbc_orientacion_results');
 const OTPS_COL = db.collection('lbc_orientacion_otps');
 const PROGRESS_COL = db.collection('lbc_orientacion_progress');
+const RATELIMIT_COL = db.collection('lbc_orientacion_ratelimits');
+const CONSENTS_COL = db.collection('lbc_orientacion_consents');
+
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const RATE_LIMIT_BLOCK_MS = 15 * 60 * 1000;
+
+const PRIVACY_VERSION = '2026-04-30';
 
 function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase();
@@ -84,6 +92,8 @@ app.post(['/', '/api'], async (req, res) => {
       case 'submitResults': result = await actionSubmitResults(body); break;
       case 'getMyResults':  result = await actionGetMyResults(body); break;
       case 'retakeTest':    result = await actionRetakeTest(body); break;
+      case 'logout':        result = await actionLogout(body); break;
+      case 'recordConsent': result = await actionRecordConsent(body); break;
       default:              result = { ok: false, error: 'accion desconocida: ' + action };
     }
     res.json(result);
@@ -110,18 +120,120 @@ async function readConfig() {
 
 /* ───── auth ───── */
 
+const HASH_PREFIX = 'scrypt$';
+
+function hashPassword(plain) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.scryptSync(String(plain), salt, 32);
+  return `${HASH_PREFIX}${salt.toString('hex')}$${hash.toString('hex')}`;
+}
+
+function verifyPassword(plain, stored) {
+  if (!stored) return false;
+  if (!String(stored).startsWith(HASH_PREFIX)) {
+    // legacy plaintext (pre-hashing migration)
+    return String(plain) === String(stored);
+  }
+  const parts = String(stored).split('$');
+  if (parts.length !== 4) return false;
+  const salt = Buffer.from(parts[2], 'hex');
+  const expected = Buffer.from(parts[3], 'hex');
+  const actual = crypto.scryptSync(String(plain), salt, expected.length);
+  if (actual.length !== expected.length) return false;
+  return crypto.timingSafeEqual(actual, expected);
+}
+
+function isHashed(stored) {
+  return typeof stored === 'string' && stored.startsWith(HASH_PREFIX);
+}
+
+function hashSessionToken(token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+async function checkRateLimit(key) {
+  const ref = RATELIMIT_COL.doc(key);
+  const snap = await ref.get();
+  const now = Date.now();
+  if (snap.exists) {
+    const d = snap.data();
+    const blockedUntil = tsMillis(d.blockedUntil);
+    if (blockedUntil && now < blockedUntil) {
+      const wait = Math.ceil((blockedUntil - now) / 1000);
+      throw new Error(`Demasiados intentos. Espera ${wait} s.`);
+    }
+  }
+}
+
+async function recordRateLimitFailure(key) {
+  const ref = RATELIMIT_COL.doc(key);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const now = Date.now();
+    let attempts = 0;
+    let firstAttempt = now;
+    if (snap.exists) {
+      const d = snap.data();
+      const first = tsMillis(d.firstAttempt);
+      if (first && now - first < RATE_LIMIT_WINDOW_MS) {
+        attempts = d.attempts || 0;
+        firstAttempt = first;
+      }
+    }
+    attempts += 1;
+    const update = { attempts, firstAttempt: new Date(firstAttempt) };
+    if (attempts >= RATE_LIMIT_MAX) {
+      update.blockedUntil = new Date(now + RATE_LIMIT_BLOCK_MS);
+    }
+    tx.set(ref, update, { merge: true });
+  });
+}
+
+async function clearRateLimit(key) {
+  await RATELIMIT_COL.doc(key).delete().catch(() => {});
+}
+
 async function checkTeacherAuth(body) {
+  const family = body.family || 'unknown';
+  const key = `teacher:${family}`;
+  await checkRateLimit(key);
   const cfg = await readConfig();
-  const pw = cfg.teacherPassword || TEACHER_PASSWORD_DEFAULT;
-  if (!body.password || body.password !== pw) throw new Error('unauthorized');
+  const stored = cfg.teacherPassword || TEACHER_PASSWORD_DEFAULT;
+  const ok = body.password && verifyPassword(body.password, stored);
+  if (!ok) {
+    await recordRateLimitFailure(key);
+    throw new Error('unauthorized');
+  }
+  await clearRateLimit(key);
+  if (!isHashed(stored)) {
+    // auto-migrate plaintext to hash on first successful login
+    await CONFIG_DOC.update({ teacherPassword: hashPassword(body.password) });
+  }
   return cfg;
 }
 
 async function checkAdminAuth(body) {
+  const key = 'admin';
+  await checkRateLimit(key);
   const cfg = await readConfig();
-  const pw = cfg.adminPassword || ADMIN_PASSWORD_DEFAULT;
-  if (!body.adminPassword || body.adminPassword !== pw) throw new Error('unauthorized');
+  const stored = cfg.adminPassword || ADMIN_PASSWORD_DEFAULT;
+  const ok = body.adminPassword && verifyPassword(body.adminPassword, stored);
+  if (!ok) {
+    await recordRateLimitFailure(key);
+    throw new Error('unauthorized');
+  }
+  await clearRateLimit(key);
+  if (!isHashed(stored)) {
+    await CONFIG_DOC.update({ adminPassword: hashPassword(body.adminPassword) });
+  }
   return cfg;
+}
+
+function sanitizeConfig(cfg) {
+  const out = { ...cfg };
+  delete out.teacherPassword;
+  delete out.adminPassword;
+  return out;
 }
 
 /* ───── stock ───── */
@@ -217,14 +329,14 @@ async function actionRedeem(body) {
 async function actionAdminLogin(body) {
   const cfg = await checkAdminAuth(body);
   const stock = await readStock();
-  return { ok: true, config: cfg, stock };
+  return { ok: true, config: sanitizeConfig(cfg), stock };
 }
 
 async function actionAdminSetTeacherPassword(body) {
   await checkAdminAuth(body);
   const np = String(body.newPassword || '').trim();
   if (!np || np.length < 4) return { ok: false, error: 'La contraseña debe tener al menos 4 caracteres.' };
-  await CONFIG_DOC.update({ teacherPassword: np });
+  await CONFIG_DOC.update({ teacherPassword: hashPassword(np) });
   return { ok: true };
 }
 
@@ -232,7 +344,7 @@ async function actionAdminSetAdminPassword(body) {
   await checkAdminAuth(body);
   const np = String(body.newPassword || '').trim();
   if (!np || np.length < 4) return { ok: false, error: 'La contraseña debe tener al menos 4 caracteres.' };
-  await CONFIG_DOC.update({ adminPassword: np });
+  await CONFIG_DOC.update({ adminPassword: hashPassword(np) });
   return { ok: true };
 }
 
@@ -312,18 +424,19 @@ async function deleteCollection(col, batchSize = 200) {
 
 async function actionAdminClearAllData(body) {
   await checkAdminAuth(body);
-  const [results, scans, otps, progress] = await Promise.all([
+  const [results, scans, otps, progress, consents, ratelimits] = await Promise.all([
     deleteCollection(RESULTS_COL),
     deleteCollection(SCANS_COL),
     deleteCollection(OTPS_COL),
     deleteCollection(PROGRESS_COL),
+    deleteCollection(CONSENTS_COL),
+    deleteCollection(RATELIMIT_COL),
   ]);
-  // Reset stock + back to test mode
   await CONFIG_DOC.update({ liveMode: false, initialStock: null, configuredAt: null });
   const emptyStock = {};
   for (const f of FAMILIES) emptyStock[f] = defaultStockFamily();
   await STOCK_DOC.set(emptyStock);
-  return { ok: true, deleted: { results, scans, otps, progress } };
+  return { ok: true, deleted: { results, scans, otps, progress, consents, ratelimits } };
 }
 
 async function actionAdminGetStats(body) {
@@ -348,7 +461,7 @@ async function actionAdminGetStats(body) {
   const resultsSnap = await RESULTS_COL.get();
   const testCount = resultsSnap.size;
 
-  return { ok: true, config: cfg, stock, scanStats: stats, testCount };
+  return { ok: true, config: sanitizeConfig(cfg), stock, scanStats: stats, testCount };
 }
 
 /* ───── public: mode check ───── */
@@ -425,6 +538,11 @@ async function actionRequestOtp(body) {
     return { ok: false, error: 'correo electrónico no válido' };
   }
 
+  const consentSnap = await CONSENTS_COL.doc(email).get();
+  if (!consentSnap.exists) {
+    return { ok: false, error: 'Debes aceptar el aviso de protección de datos antes de continuar.' };
+  }
+
   const ref = OTPS_COL.doc(email);
   const snap = await ref.get();
   const now = Date.now();
@@ -480,7 +598,8 @@ async function actionVerifyOtp(body) {
   const sessionToken = generateSessionToken();
   await ref.update({
     attempts: 0,
-    sessionToken,
+    sessionTokenHash: hashSessionToken(sessionToken),
+    sessionToken: Firestore.FieldValue.delete(),
     sessionExpiresAt: new Date(Date.now() + SESSION_TTL_MS),
     verifiedAt: new Date(),
   });
@@ -503,7 +622,19 @@ async function requireSession(email, sessionToken) {
   const snap = await OTPS_COL.doc(email).get();
   if (!snap.exists) throw new Error('sesión no válida');
   const data = snap.data();
-  if (!data.sessionToken || data.sessionToken !== sessionToken) throw new Error('sesión no válida');
+  const incomingHash = hashSessionToken(sessionToken);
+  // Migration support: accept legacy plaintext token, then upgrade to hash
+  if (data.sessionTokenHash) {
+    if (data.sessionTokenHash !== incomingHash) throw new Error('sesión no válida');
+  } else if (data.sessionToken) {
+    if (data.sessionToken !== sessionToken) throw new Error('sesión no válida');
+    await OTPS_COL.doc(email).update({
+      sessionTokenHash: incomingHash,
+      sessionToken: Firestore.FieldValue.delete(),
+    }).catch(() => {});
+  } else {
+    throw new Error('sesión no válida');
+  }
   const exp = tsMillis(data.sessionExpiresAt);
   if (!exp || Date.now() > exp) throw new Error('sesión caducada');
 }
@@ -595,6 +726,30 @@ async function actionRetakeTest(body) {
   await RESULTS_COL.doc(email).delete().catch(() => {});
   await PROGRESS_COL.doc(email).delete().catch(() => {});
   return { ok: true };
+}
+
+async function actionLogout(body) {
+  const email = normalizeEmail(body.email);
+  if (!email) return { ok: true };
+  await OTPS_COL.doc(email).update({
+    sessionTokenHash: Firestore.FieldValue.delete(),
+    sessionToken: Firestore.FieldValue.delete(),
+    sessionExpiresAt: Firestore.FieldValue.delete(),
+  }).catch(() => {});
+  return { ok: true };
+}
+
+async function actionRecordConsent(body) {
+  const email = normalizeEmail(body.email);
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: 'correo electrónico no válido' };
+  }
+  if (body.accepted !== true) return { ok: false, error: 'consentimiento requerido' };
+  await CONSENTS_COL.doc(email).set({
+    acceptedAt: new Date(),
+    privacyVersion: PRIVACY_VERSION,
+  }, { merge: true });
+  return { ok: true, privacyVersion: PRIVACY_VERSION };
 }
 
 /* ───── sheets helpers ───── */
