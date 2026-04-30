@@ -229,17 +229,17 @@ async function clearRateLimit(key) {
 async function checkTeacherAuth(body) {
   const family = body.family || 'unknown';
   const key = `teacher:${family}`;
-  await checkRateLimit(key);
   const cfg = await readConfig();
   const stored = cfg.teacherPassword || TEACHER_PASSWORD_DEFAULT;
   const ok = body.password && verifyPassword(body.password, stored);
   if (!ok) {
+    // Rate limit only on failed attempts; check first to short-circuit lockouts
+    await checkRateLimit(key);
     await recordRateLimitFailure(key);
     throw new Error('unauthorized');
   }
   await clearRateLimit(key);
   if (!isHashed(stored)) {
-    // auto-migrate plaintext to hash on first successful login
     await CONFIG_DOC.update({ teacherPassword: hashPassword(body.password) });
   }
   return cfg;
@@ -247,11 +247,11 @@ async function checkTeacherAuth(body) {
 
 async function checkAdminAuth(body) {
   const key = 'admin';
-  await checkRateLimit(key);
   const cfg = await readConfig();
   const stored = cfg.adminPassword || ADMIN_PASSWORD_DEFAULT;
   const ok = body.adminPassword && verifyPassword(body.adminPassword, stored);
   if (!ok) {
+    await checkRateLimit(key);
     await recordRateLimitFailure(key);
     throw new Error('unauthorized');
   }
