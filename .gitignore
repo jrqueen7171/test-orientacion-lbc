@@ -1,0 +1,29 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Entornos y secretos
+.env
+.env.*
+*.key
+*.pem
+service-account*.json
+credentials*.json
+
+# Sistema
+.DS_Store
+Thumbs.db
+*~
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build / temporales
+dist/
+build/
+*.log

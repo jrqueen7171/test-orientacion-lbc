@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { Firestore } = require('@google-cloud/firestore');
 const { google } = require('googleapis');
+const { getQuestionsForClient, gradeAnswers, FAMILY_NAMES } = require('./questions');
 
 const FAMILIES = ['admin', 'comercio', 'obra', 'electro', 'textil'];
 const PRIZE_TYPES = [1, 2, 3];
@@ -47,8 +48,19 @@ function normalizeEmail(v) {
 const app = express();
 app.use(express.text({ type: '*/*', limit: '100kb' }));
 
+const ALLOWED_ORIGINS = new Set([
+  'https://jrqueen7171.github.io',
+  'https://concurso.jrqueen71.es',
+  'https://orientacion.jrqueen71.es',
+  'https://test.jrqueen71.es',
+]);
+
 app.use((req, res, next) => {
-  res.set('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Vary', 'Origin');
+  }
   res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -59,6 +71,12 @@ app.get('/', (req, res) => {
   res.json({ ok: true, service: 'lbc-orientacion', version: 2 });
 });
 
+function getClientIp(req) {
+  const xff = req.headers['x-forwarded-for'] || '';
+  const first = String(xff).split(',')[0].trim();
+  return first || req.ip || 'unknown';
+}
+
 app.post(['/', '/api'], async (req, res) => {
   let body = {};
   try {
@@ -66,6 +84,7 @@ app.post(['/', '/api'], async (req, res) => {
   } catch (err) {
     return res.json({ ok: false, error: 'body inválido: ' + err.message });
   }
+  body._ip = getClientIp(req);
   try {
     const action = body.action || '';
     let result;
@@ -94,6 +113,8 @@ app.post(['/', '/api'], async (req, res) => {
       case 'retakeTest':    result = await actionRetakeTest(body); break;
       case 'logout':        result = await actionLogout(body); break;
       case 'recordConsent': result = await actionRecordConsent(body); break;
+      case 'getQuestions':  result = await actionGetQuestions(body); break;
+      case 'gradeAnswers':  result = await actionGradeAnswers(body); break;
       default:              result = { ok: false, error: 'accion desconocida: ' + action };
     }
     res.json(result);
@@ -165,7 +186,10 @@ async function checkRateLimit(key) {
   }
 }
 
-async function recordRateLimitFailure(key) {
+async function recordRateLimitFailure(key, opts) {
+  const max = (opts && opts.max) || RATE_LIMIT_MAX;
+  const windowMs = (opts && opts.windowMs) || RATE_LIMIT_WINDOW_MS;
+  const blockMs = (opts && opts.blockMs) || RATE_LIMIT_BLOCK_MS;
   const ref = RATELIMIT_COL.doc(key);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -175,18 +199,27 @@ async function recordRateLimitFailure(key) {
     if (snap.exists) {
       const d = snap.data();
       const first = tsMillis(d.firstAttempt);
-      if (first && now - first < RATE_LIMIT_WINDOW_MS) {
+      if (first && now - first < windowMs) {
         attempts = d.attempts || 0;
         firstAttempt = first;
       }
     }
     attempts += 1;
     const update = { attempts, firstAttempt: new Date(firstAttempt) };
-    if (attempts >= RATE_LIMIT_MAX) {
-      update.blockedUntil = new Date(now + RATE_LIMIT_BLOCK_MS);
+    if (attempts >= max) {
+      update.blockedUntil = new Date(now + blockMs);
     }
     tx.set(ref, update, { merge: true });
   });
+}
+
+const OTP_LIMITS = {
+  perIp: { max: 30, windowMs: 60 * 60 * 1000, blockMs: 60 * 60 * 1000 },
+  perEmail: { max: 8, windowMs: 60 * 60 * 1000, blockMs: 60 * 60 * 1000 },
+};
+
+function safeKey(s) {
+  return String(s || 'unknown').replace(/[^a-zA-Z0-9._:-]/g, '_').slice(0, 80);
 }
 
 async function clearRateLimit(key) {
@@ -538,10 +571,22 @@ async function actionRequestOtp(body) {
     return { ok: false, error: 'correo electrónico no válido' };
   }
 
+  const ipKey = `otp:ip:${safeKey(body._ip)}`;
+  const emailKey = `otp:email:${safeKey(email)}`;
+  try {
+    await checkRateLimit(ipKey);
+    await checkRateLimit(emailKey);
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+
   const consentSnap = await CONSENTS_COL.doc(email).get();
   if (!consentSnap.exists) {
     return { ok: false, error: 'Debes aceptar el aviso de protección de datos antes de continuar.' };
   }
+
+  await recordRateLimitFailure(ipKey, OTP_LIMITS.perIp);
+  await recordRateLimitFailure(emailKey, OTP_LIMITS.perEmail);
 
   const ref = OTPS_COL.doc(email);
   const snap = await ref.get();
@@ -606,7 +651,7 @@ async function actionVerifyOtp(body) {
 
   const cfg = await readConfig();
   const resultSnap = await RESULTS_COL.doc(email).get();
-  const result = resultSnap.exists ? resultSnap.data() : null;
+  const result = resultSnap.exists ? enrichLegacyResult(resultSnap.data()) : null;
 
   let progress = null;
   if (!result) {
@@ -651,6 +696,22 @@ async function actionSaveProgress(body) {
   return { ok: true };
 }
 
+async function pickPrizeForFamily(stock, familyKey) {
+  const fc = stock[familyKey];
+  if (!fc) return { hasPrize: false };
+  const available = [1, 2, 3].filter(pt => (fc.counts[pt - 1] || 0) > 0);
+  if (available.length === 0) return { hasPrize: false };
+  const prizeType = available[Math.floor(Math.random() * available.length)];
+  return { hasPrize: true, prizeType };
+}
+
+function generatePrizeCode() {
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let r = 'LBC-';
+  for (let i = 0; i < 6; i++) r += c[Math.floor(Math.random() * c.length)];
+  return r;
+}
+
 async function actionSubmitResults(body) {
   try {
     const email = normalizeEmail(body.email);
@@ -662,34 +723,48 @@ async function actionSubmitResults(body) {
     const snap = await ref.get();
 
     if (snap.exists && cfg.liveMode) {
-      return { ok: true, alreadyExists: true, result: snap.data() };
+      return { ok: true, alreadyExists: true, result: enrichLegacyResult(snap.data()) };
+    }
+
+    const graded = gradeAnswers(body.answers || {});
+    const sortedFams = Object.entries(graded.familyPcts).sort((a, b) => b[1] - a[1]);
+    const fam1 = sortedFams[0] ? sortedFams[0][0] : '';
+    const fam2 = sortedFams[1] ? sortedFams[1][0] : '';
+
+    let prizeCode = '';
+    let prizeType = 0;
+    let hasPrize = false;
+    if (cfg.liveMode) {
+      const stock = await readStock();
+      const pr = await pickPrizeForFamily(stock, graded.familyKey);
+      if (pr.hasPrize) {
+        prizeCode = generatePrizeCode();
+        prizeType = pr.prizeType;
+        hasPrize = true;
+      }
+    } else {
+      prizeCode = generatePrizeCode();
+      prizeType = 1 + Math.floor(Math.random() * 3);
+      hasPrize = true;
     }
 
     const doc = {
       email,
       answers: body.answers || {},
-      prizeCode: body.codigoPremio || '',
-      prizeType: parseInt(body.tipoPremio, 10) || 0,
-      familyKey: body.familyKey || '',
-      familia1: body.familia1 || '',
-      pctFamilia1: body.pctFamilia1 || 0,
-      familia2: body.familia2 || '',
-      pctFamilia2: body.pctFamilia2 || 0,
-      correctas: body.correctas || 0,
-      totalEvaluables: body.totalEvaluables || 0,
-      pctAcierto: body.pctAcierto || 0,
-      soft: {
-        puntualidad: body.puntualidad || 0,
-        asertividad: body.asertividad || 0,
-        donGentes: body.donGentes || 0,
-        resolucionConflictos: body.resolucionConflictos || 0,
-        negociacion: body.negociacion || 0,
-        organizacion: body.organizacion || 0,
-        creatividad: body.creatividad || 0,
-        trabajoEquipo: body.trabajoEquipo || 0,
-        adaptabilidad: body.adaptabilidad || 0,
-        pensamientoCritico: body.pensamientoCritico || 0,
-      },
+      prizeCode,
+      prizeType,
+      hasPrize,
+      familyKey: graded.familyKey,
+      familia1: FAMILY_NAMES[fam1] || fam1,
+      pctFamilia1: graded.familyPcts[fam1] || 0,
+      familia2: FAMILY_NAMES[fam2] || fam2,
+      pctFamilia2: graded.familyPcts[fam2] || 0,
+      familyPcts: graded.familyPcts,
+      softSkills: graded.softSkills,
+      feedback: graded.feedback,
+      totalCorrect: graded.totalCorrect,
+      totalGraded: graded.totalGraded,
+      pctAcierto: graded.totalGraded > 0 ? Math.round(graded.totalCorrect / graded.totalGraded * 100) : 0,
       liveMode: !!cfg.liveMode,
       timestamp: new Date().toISOString(),
     };
@@ -697,7 +772,7 @@ async function actionSubmitResults(body) {
     PROGRESS_COL.doc(email).delete().catch(() => {});
 
     if (SHEET_ID) {
-      appendResultsRow(body, email).catch((e) => console.log('sheet results log error:', e.message));
+      appendResultsRow(doc).catch((e) => console.log('sheet results log error:', e.message));
     }
 
     return { ok: true, result: doc };
@@ -706,13 +781,31 @@ async function actionSubmitResults(body) {
   }
 }
 
+function enrichLegacyResult(r) {
+  if (!r) return r;
+  if (Array.isArray(r.feedback)) return r;
+  // Legacy doc lacks feedback/familyPcts/softSkills — recompute from stored answers
+  const graded = gradeAnswers(r.answers || {});
+  return {
+    ...r,
+    familyKey: r.familyKey || graded.familyKey,
+    familyPcts: graded.familyPcts,
+    softSkills: graded.softSkills,
+    feedback: graded.feedback,
+    totalCorrect: graded.totalCorrect,
+    totalGraded: graded.totalGraded,
+    pctAcierto: r.pctAcierto || (graded.totalGraded > 0 ? Math.round(graded.totalCorrect / graded.totalGraded * 100) : 0),
+    hasPrize: typeof r.hasPrize === 'boolean' ? r.hasPrize : !!(r.prizeCode && r.prizeType),
+  };
+}
+
 async function actionGetMyResults(body) {
   const email = normalizeEmail(body.email);
   if (!email) return { ok: false, error: 'email obligatorio' };
   try { await requireSession(email, body.sessionToken); } catch (e) { return { ok: false, error: e.message }; }
   const cfg = await readConfig();
   const snap = await RESULTS_COL.doc(email).get();
-  if (snap.exists) return { ok: true, found: true, result: snap.data(), liveMode: !!cfg.liveMode };
+  if (snap.exists) return { ok: true, found: true, result: enrichLegacyResult(snap.data()), liveMode: !!cfg.liveMode };
   const progSnap = await PROGRESS_COL.doc(email).get();
   return { ok: true, found: false, progress: progSnap.exists ? progSnap.data() : null, liveMode: !!cfg.liveMode };
 }
@@ -752,9 +845,21 @@ async function actionRecordConsent(body) {
   return { ok: true, privacyVersion: PRIVACY_VERSION };
 }
 
+async function actionGetQuestions(body) {
+  return { ok: true, questions: getQuestionsForClient() };
+}
+
+async function actionGradeAnswers(body) {
+  const email = normalizeEmail(body.email);
+  if (!email) return { ok: false, error: 'email obligatorio' };
+  try { await requireSession(email, body.sessionToken); } catch (e) { return { ok: false, error: e.message }; }
+  const result = gradeAnswers(body.answers || {});
+  return { ok: true, result };
+}
+
 /* ───── sheets helpers ───── */
 
-async function appendResultsRow(body, email) {
+async function appendResultsRow(doc) {
   const sheets = await getSheets();
   await ensureSheet(sheets, 'resultados', [
     'timestamp', 'email', 'codigo', 'tipoPremio', 'familyKey',
@@ -764,15 +869,17 @@ async function appendResultsRow(body, email) {
     'negociacion', 'organizacion', 'creatividad', 'trabajoEquipo',
     'adaptabilidad', 'pensamientoCritico',
   ]);
+  const ss = doc.softSkills || {};
+  const sk = (k) => (ss[k] && ss[k].pct) || 0;
   const row = [
-    new Date().toISOString(),
-    email, body.codigoPremio || '', body.tipoPremio || '', body.familyKey || '',
-    body.familia1 || '', body.pctFamilia1 || 0,
-    body.familia2 || '', body.pctFamilia2 || 0,
-    body.correctas || 0, body.totalEvaluables || 0, body.pctAcierto || 0,
-    body.puntualidad || 0, body.asertividad || 0, body.donGentes || 0, body.resolucionConflictos || 0,
-    body.negociacion || 0, body.organizacion || 0, body.creatividad || 0, body.trabajoEquipo || 0,
-    body.adaptabilidad || 0, body.pensamientoCritico || 0,
+    doc.timestamp || new Date().toISOString(),
+    doc.email, doc.prizeCode || '', doc.prizeType || '', doc.familyKey || '',
+    doc.familia1 || '', doc.pctFamilia1 || 0,
+    doc.familia2 || '', doc.pctFamilia2 || 0,
+    doc.totalCorrect || 0, doc.totalGraded || 0, doc.pctAcierto || 0,
+    sk('puntualidad'), sk('asertividad'), sk('don_gentes'), sk('resolucion_conflictos'),
+    sk('negociacion'), sk('organizacion'), sk('creatividad'), sk('trabajo_equipo'),
+    sk('adaptabilidad'), sk('pensamiento_critico'),
   ];
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
