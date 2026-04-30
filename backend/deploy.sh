@@ -6,8 +6,8 @@
 #   export SHEET_ID="id-de-tu-google-sheet"
 #   # opcional (por defecto toma el project de `gcloud config`):
 #   # export PROJECT_ID="klasvid-..."
-#   # opcional (por defecto profesor26):
-#   # export TEACHER_PASSWORD="otra-clave"
+#   # obligatorio si el secreto del profesor no existe aún:
+#   # export TEACHER_PASSWORD="contraseña-fuerte-elegida-por-ti"
 #   ./deploy.sh
 #
 # Requisitos previos:
@@ -24,7 +24,6 @@ PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)
 REGION="${REGION:-europe-west1}"
 SERVICE="${SERVICE:-lbc-orientacion}"
 SECRET_NAME="${SECRET_NAME:-lbc-teacher-password}"
-TEACHER_PASSWORD_DEFAULT="profesor26"
 
 # Gmail para el envío de códigos OTP a los alumnos (reutiliza la infra Klasvid)
 GMAIL_USER="${GMAIL_USER:-jrqueen71@gmail.com}"
@@ -59,9 +58,12 @@ gcloud services enable \
 if gcloud secrets describe "$SECRET_NAME" --project="$PROJECT_ID" >/dev/null 2>&1; then
   echo "→ Secret $SECRET_NAME ya existe (se reutiliza la versión latest)."
 else
-  PW="${TEACHER_PASSWORD:-$TEACHER_PASSWORD_DEFAULT}"
+  if [[ -z "${TEACHER_PASSWORD:-}" ]]; then
+    echo "❌ Falta TEACHER_PASSWORD. Exporta una contraseña fuerte: export TEACHER_PASSWORD=..." >&2
+    exit 1
+  fi
   echo "→ Creando secret $SECRET_NAME..."
-  printf '%s' "$PW" | gcloud secrets create "$SECRET_NAME" \
+  printf '%s' "$TEACHER_PASSWORD" | gcloud secrets create "$SECRET_NAME" \
     --project="$PROJECT_ID" \
     --replication-policy="automatic" \
     --data-file=-

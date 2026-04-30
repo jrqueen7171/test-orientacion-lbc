@@ -13,8 +13,8 @@ const { google } = require('googleapis');
 const FAMILIES = ['admin', 'comercio', 'obra', 'electro', 'textil'];
 const PRIZE_TYPES = [1, 2, 3];
 
-const TEACHER_PASSWORD_DEFAULT = process.env.TEACHER_PASSWORD || 'profesor26';
-const ADMIN_PASSWORD_DEFAULT = process.env.ADMIN_PASSWORD || 'admin2026';
+const TEACHER_PASSWORD_DEFAULT = process.env.TEACHER_PASSWORD || '';
+const ADMIN_PASSWORD_DEFAULT = process.env.ADMIN_PASSWORD || '';
 const SHEET_ID = process.env.SHEET_ID || '';
 const GMAIL_USER = process.env.GMAIL_USER || '';
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';

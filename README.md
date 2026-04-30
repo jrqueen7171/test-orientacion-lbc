@@ -49,8 +49,8 @@ gcloud firestore databases create --location=eur3
 ```bash
 cd backend
 export SHEET_ID="id-de-tu-google-sheet"
-# opcional — por defecto usa "profesor26":
-# export TEACHER_PASSWORD="otra-clave"
+# obligatorio si el secreto aún no existe — elige una contraseña fuerte:
+export TEACHER_PASSWORD="contraseña-fuerte-elegida-por-ti"
 ./deploy.sh
 ```
 
