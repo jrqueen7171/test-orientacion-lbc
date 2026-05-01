@@ -34,6 +34,10 @@ const OTPS_COL = db.collection('lbc_orientacion_otps');
 const PROGRESS_COL = db.collection('lbc_orientacion_progress');
 const RATELIMIT_COL = db.collection('lbc_orientacion_ratelimits');
 const CONSENTS_COL = db.collection('lbc_orientacion_consents');
+const ADMIN_RESETS_DOC = db.collection('lbc_orientacion').doc('admin_reset');
+
+const ADMIN_RESET_EXPIRY_MS = 30 * 60 * 1000;
+const ADMIN_RESET_MAX_ATTEMPTS = 5;
 
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
@@ -102,6 +106,9 @@ app.post(['/', '/api'], async (req, res) => {
       case 'adminResetTestMode': result = await actionAdminResetTestMode(body); break;
       case 'adminClearAllData': result = await actionAdminClearAllData(body); break;
       case 'adminGetStats':  result = await actionAdminGetStats(body); break;
+      case 'adminSetEmail':  result = await actionAdminSetEmail(body); break;
+      case 'requestAdminReset': result = await actionRequestAdminReset(body); break;
+      case 'resetAdminPassword': result = await actionResetAdminPassword(body); break;
       // Student
       case 'getMode':       result = await actionGetMode(); break;
       case 'getAvailablePrize': result = await actionGetAvailablePrize(body); break;
@@ -131,6 +138,7 @@ async function readConfig() {
   const defaults = {
     teacherPassword: TEACHER_PASSWORD_DEFAULT,
     adminPassword: ADMIN_PASSWORD_DEFAULT,
+    adminEmail: GMAIL_USER || '',
     liveMode: false,
     configuredAt: null,
     secondsPerQuestion: 0,
@@ -155,10 +163,12 @@ function verifyPassword(plain, stored) {
     // legacy plaintext (pre-hashing migration)
     return String(plain) === String(stored);
   }
+  // format: 'scrypt$<saltHex>$<hashHex>'  ->  ['scrypt', saltHex, hashHex]
   const parts = String(stored).split('$');
-  if (parts.length !== 4) return false;
-  const salt = Buffer.from(parts[2], 'hex');
-  const expected = Buffer.from(parts[3], 'hex');
+  if (parts.length !== 3) return false;
+  const salt = Buffer.from(parts[1], 'hex');
+  const expected = Buffer.from(parts[2], 'hex');
+  if (salt.length === 0 || expected.length === 0) return false;
   const actual = crypto.scryptSync(String(plain), salt, expected.length);
   if (actual.length !== expected.length) return false;
   return crypto.timingSafeEqual(actual, expected);
@@ -387,6 +397,139 @@ async function actionAdminSetTimer(body) {
   if (isNaN(s) || s < 0 || s > 600) return { ok: false, error: 'Valor entre 0 y 600 segundos.' };
   await CONFIG_DOC.update({ secondsPerQuestion: s });
   return { ok: true, secondsPerQuestion: s };
+}
+
+async function actionAdminSetEmail(body) {
+  await checkAdminAuth(body);
+  const email = normalizeEmail(body.adminEmail);
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: 'Correo no válido.' };
+  }
+  await CONFIG_DOC.update({ adminEmail: email });
+  return { ok: true, adminEmail: email };
+}
+
+function generateResetCode() {
+  // 8 chars, base32-friendly (no I,O,0,1)
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let r = '';
+  for (let i = 0; i < 8; i++) r += c[crypto.randomInt(0, c.length)];
+  return r;
+}
+
+function maskEmail(e) {
+  if (!e) return '';
+  const [u, d] = String(e).split('@');
+  if (!u || !d) return e;
+  const head = u.slice(0, Math.min(2, u.length));
+  return `${head}${'*'.repeat(Math.max(1, u.length - 2))}@${d}`;
+}
+
+async function sendAdminResetEmail(toEmail, code) {
+  const m = getMailer();
+  await m.sendMail({
+    from: `"IES Luis Bueno Crespo" <${GMAIL_USER}>`,
+    to: toEmail,
+    subject: 'Recuperación de contraseña — Panel de administración',
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:440px;margin:0 auto;padding:24px;color:#1b1b1f">
+        <div style="display:inline-block;background:#2a7d4f;color:#fff;font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;padding:5px 14px;border-radius:20px;margin-bottom:14px">IES Luis Bueno Crespo</div>
+        <h2 style="color:#2a7d4f;margin:0 0 8px">Código de recuperación de admin</h2>
+        <p style="color:#555;margin:0 0 16px">Has solicitado restablecer la contraseña de administración. Introduce este código en la app:</p>
+        <div style="font-size:30px;font-weight:800;letter-spacing:4px;color:#2a7d4f;padding:16px;background:#e6f4ec;border-radius:12px;text-align:center">${code}</div>
+        <p style="color:#6b6b7b;font-size:12px;margin:18px 0 0">El código caduca en 30 minutos. Si no has solicitado este restablecimiento, ignora este mensaje y considera revisar tu seguridad.</p>
+      </div>
+    `,
+  });
+}
+
+async function sendAdminPasswordChangedEmail(toEmail) {
+  const m = getMailer();
+  await m.sendMail({
+    from: `"IES Luis Bueno Crespo" <${GMAIL_USER}>`,
+    to: toEmail,
+    subject: 'Tu contraseña de administración ha cambiado',
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:440px;margin:0 auto;padding:24px;color:#1b1b1f">
+        <h2 style="color:#2a7d4f;margin:0 0 10px">Contraseña actualizada</h2>
+        <p style="color:#555">La contraseña de administración del Test de Orientación se ha cambiado correctamente el ${new Date().toLocaleString('es-ES')}.</p>
+        <p style="color:#6b6b7b;font-size:12px;margin-top:16px">Si no has sido tú, contacta inmediatamente con quien gestiona la app.</p>
+      </div>
+    `,
+  });
+}
+
+async function actionRequestAdminReset(body) {
+  const ipKey = `adminReset:ip:${safeKey(body._ip)}`;
+  try {
+    await checkRateLimit(ipKey);
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+  await recordRateLimitFailure(ipKey, { max: 3, windowMs: 60 * 60 * 1000, blockMs: 60 * 60 * 1000 });
+
+  const cfg = await readConfig();
+  const adminEmail = cfg.adminEmail || GMAIL_USER || '';
+  if (!adminEmail) {
+    return { ok: false, error: 'No hay correo de admin configurado. Contacta con quien gestiona la app.' };
+  }
+
+  const code = generateResetCode();
+  await ADMIN_RESETS_DOC.set({
+    codeHash: hashOTP(code),
+    attempts: 0,
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + ADMIN_RESET_EXPIRY_MS),
+  });
+
+  try {
+    await sendAdminResetEmail(adminEmail, code);
+  } catch (e) {
+    console.log('sendAdminResetEmail error:', e.message);
+    return { ok: false, error: 'No se pudo enviar el correo. Inténtalo más tarde.' };
+  }
+
+  return { ok: true, sentTo: maskEmail(adminEmail) };
+}
+
+async function actionResetAdminPassword(body) {
+  const code = String(body.code || '').trim().toUpperCase();
+  const np = String(body.newPassword || '').trim();
+  if (!code || !np) return { ok: false, error: 'Código y nueva contraseña requeridos.' };
+  if (np.length < 4) return { ok: false, error: 'La contraseña debe tener al menos 4 caracteres.' };
+
+  const snap = await ADMIN_RESETS_DOC.get();
+  if (!snap.exists) return { ok: false, error: 'No hay un código activo. Solicita uno nuevo.' };
+  const data = snap.data();
+
+  const expiresAt = tsMillis(data.expiresAt);
+  if (!expiresAt || Date.now() > expiresAt) {
+    await ADMIN_RESETS_DOC.delete().catch(() => {});
+    return { ok: false, error: 'Código caducado. Solicita uno nuevo.' };
+  }
+
+  const attempts = data.attempts || 0;
+  if (attempts >= ADMIN_RESET_MAX_ATTEMPTS) {
+    await ADMIN_RESETS_DOC.delete().catch(() => {});
+    return { ok: false, error: 'Demasiados intentos. Solicita un código nuevo.' };
+  }
+
+  if (hashOTP(code) !== data.codeHash) {
+    await ADMIN_RESETS_DOC.update({ attempts: attempts + 1 });
+    const remaining = ADMIN_RESET_MAX_ATTEMPTS - attempts - 1;
+    return { ok: false, error: `Código incorrecto. ${remaining} intento${remaining !== 1 ? 's' : ''} restante${remaining !== 1 ? 's' : ''}.` };
+  }
+
+  await CONFIG_DOC.update({ adminPassword: hashPassword(np) });
+  await ADMIN_RESETS_DOC.delete().catch(() => {});
+  await clearRateLimit('admin').catch(() => {});
+
+  const cfg = await readConfig();
+  if (cfg.adminEmail) {
+    sendAdminPasswordChangedEmail(cfg.adminEmail).catch((e) => console.log('confirmation email error:', e.message));
+  }
+
+  return { ok: true };
 }
 
 async function actionAdminSetPrizes(body) {
