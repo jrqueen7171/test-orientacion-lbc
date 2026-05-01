@@ -737,11 +737,15 @@ function renderResults(){
       const qd=$('qrCodeDiv');
       if(qd&&typeof QRCode!=='undefined'){
         qd.innerHTML='';
+        const qrPayload=JSON.stringify({code:S.prizeCode,familyKey:wk,prizeType:S.prizeType});
         try{
-          new QRCode(qd,{text:JSON.stringify({code:S.prizeCode,email:S.email,family:w.nombre,familyKey:wk,score:sorted[0][1],prizeType:S.prizeType,date:new Date().toISOString().split('T')[0]}),width:220,height:220,colorDark:"#1b1b1f",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.L});
+          new QRCode(qd,{text:qrPayload,width:220,height:220,colorDark:"#1b1b1f",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
         }catch(err){
-          qd.innerHTML='<p style="color:var(--red);font-size:12px">No se pudo generar el QR. Muestra el código de arriba al profesor/a.</p>';
+          console.error('QR error:',err);
+          qd.innerHTML='<p style="color:var(--red);font-size:12px">No se pudo generar el QR ('+(err&&err.message||'error')+'). Muestra el código de arriba al profesor/a.</p>';
         }
+      }else if(qd){
+        qd.innerHTML='<p style="color:var(--red);font-size:12px">Librería QR no cargada. Recarga la página.</p>';
       }
     },200);
   }
